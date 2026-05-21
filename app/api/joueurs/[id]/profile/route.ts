@@ -8,7 +8,6 @@ export async function GET(
   try {
     const { id: playerId } = await params;
 
-    // Récupérer le joueur
     const player = await prisma.player.findUnique({
       where: { id: playerId },
     });
@@ -17,7 +16,6 @@ export async function GET(
       return NextResponse.json({ error: 'Joueur introuvable' }, { status: 404 });
     }
 
-    // Récupérer toutes les sessions du joueur
     const sessionPlayers = await prisma.sessionPlayer.findMany({
       where: {
         playerId,
@@ -55,12 +53,19 @@ export async function GET(
     // Stats mid / 3pts / LF
     const allSpotResults = sessionPlayers.flatMap(sp => sp.spotResults);
     
-    const midSpots = allSpotResults.filter(sr => sr.spotLabel.includes('MID'));
+    // ✅ MID (exclu LF)
+    const midSpots = allSpotResults.filter(sr => 
+      sr.spotLabel?.includes('MID') && 
+      !sr.spotLabel?.includes('LANCER FRANC')
+    );
     const midAttempts = midSpots.length * 10;
     const midMakes = midSpots.reduce((sum, sr) => sum + sr.makes, 0);
     const midRate = midAttempts > 0 ? (midMakes / midAttempts) * 100 : 0;
 
-    const threeSpots = allSpotResults.filter(sr => sr.spotLabel.includes('3PTS'));
+    // ✅ 3 PTS (avec ou sans espace)
+    const threeSpots = allSpotResults.filter(sr => 
+      sr.spotLabel?.includes('3 PTS') || sr.spotLabel?.includes('3PTS')
+    );
     const threeAttempts = threeSpots.length * 10;
     const threeMakes = threeSpots.reduce((sum, sr) => sum + sr.makes, 0);
     const threePointRate = threeAttempts > 0 ? (threeMakes / threeAttempts) * 100 : 0;
