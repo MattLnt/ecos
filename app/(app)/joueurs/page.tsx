@@ -182,23 +182,41 @@ export default function JoueursPage() {
                 stats={player.stats}
               />
 
-              {/* Actions overlay - visible au tap sur mobile, hover desktop */}
-              <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 flex gap-1.5 sm:gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-10">
-                <button
-                  onClick={(e) => handleEdit(player, e)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-2 bg-[rgba(0,191,255,0.95)] backdrop-blur-sm text-white rounded-lg text-[10px] sm:text-xs font-bold hover:bg-[#00BFFF] active:scale-95 transition-all shadow-xl"
-                >
-                  <Edit2 size={12} className="sm:w-3.5 sm:h-3.5" />
-                  <span className="hidden sm:inline">Modifier</span>
-                </button>
-                <button
-                  onClick={(e) => handleDelete(player.id, e)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-2 bg-[rgba(239,68,68,0.95)] backdrop-blur-sm text-white rounded-lg text-[10px] sm:text-xs font-bold hover:bg-red-500 active:scale-95 transition-all shadow-xl"
-                >
-                  <Trash2 size={12} className="sm:w-3.5 sm:h-3.5" />
-                  <span className="hidden sm:inline">Supprimer</span>
-                </button>
-              </div>
+{/* Actions MOBILE : petites icônes flottantes en haut à droite */}
+<div className="absolute top-2 right-2 flex flex-col gap-1.5 z-20 sm:hidden">
+  <button
+    onClick={(e) => handleEdit(player, e)}
+    className="w-8 h-8 flex items-center justify-center bg-[rgba(0,191,255,0.95)] backdrop-blur-sm text-white rounded-full active:scale-90 transition-all shadow-lg"
+    aria-label="Modifier"
+  >
+    <Edit2 size={14} />
+  </button>
+  <button
+    onClick={(e) => handleDelete(player.id, e)}
+    className="w-8 h-8 flex items-center justify-center bg-[rgba(239,68,68,0.95)] backdrop-blur-sm text-white rounded-full active:scale-90 transition-all shadow-lg"
+    aria-label="Supprimer"
+  >
+    <Trash2 size={14} />
+  </button>
+</div>
+
+            {/* Actions DESKTOP : overlay au hover, en bas de carte */}
+            <div className="hidden sm:flex absolute bottom-6 left-6 right-6 gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <button
+                onClick={(e) => handleEdit(player, e)}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[rgba(0,191,255,0.95)] backdrop-blur-sm text-white rounded-lg text-xs font-bold hover:bg-[#00BFFF] active:scale-95 transition-all shadow-xl"
+              >
+                <Edit2 size={14} />
+                Modifier
+              </button>
+              <button
+                onClick={(e) => handleDelete(player.id, e)}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[rgba(239,68,68,0.95)] backdrop-blur-sm text-white rounded-lg text-xs font-bold hover:bg-red-500 active:scale-95 transition-all shadow-xl"
+              >
+                <Trash2 size={14} />
+                Supprimer
+              </button>
+            </div>
             </div>
           ))}
         </div>
