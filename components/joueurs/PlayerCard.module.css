@@ -1,0 +1,429 @@
+/* ============ CARTE PRINCIPALE ============ */
+.card {
+  width: 320px;
+  height: 468px;
+  position: relative;
+  perspective: 1000px;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+}
+
+.cardFrame {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    #0a1628 0%,
+    #0f1f3a 50%,
+    #0a1628 100%
+  );
+  border-radius: 16px;
+  overflow: hidden;
+  /* Bordure gold avec dégradé */
+  border: 2px solid;
+  border-image: linear-gradient(
+    135deg,
+    #f6e7a8 0%,
+    #d9b14a 25%,
+    #a07320 50%,
+    #d9b14a 75%,
+    #f6e7a8 100%
+  ) 1;
+  box-shadow: 
+    0 0 0 1px rgba(217, 177, 74, 0.3),
+    0 10px 40px rgba(0, 0, 0, 0.6),
+    inset 0 0 20px rgba(217, 177, 74, 0.1);
+}
+
+/* Texture rayée subtile */
+.cardFrame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 6px,
+    rgba(0, 191, 255, 0.02) 6px,
+    rgba(0, 191, 255, 0.02) 7px
+  );
+  pointer-events: none;
+}
+
+/* ============ SHARDS DÉCORATIFS ============ */
+.shards {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 180px;
+  height: 280px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.shard1, .shard2, .shard3, .shard4 {
+  position: absolute;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 168, 232, 0.4),
+    rgba(0, 191, 255, 0.2)
+  );
+  border: 1px solid rgba(0, 191, 255, 0.3);
+}
+
+.shard1 {
+  top: 30px;
+  right: 20px;
+  width: 80px;
+  height: 100px;
+  transform: rotate(15deg) skewY(-10deg);
+  clip-path: polygon(0 0, 100% 10%, 90% 100%, 10% 90%);
+  opacity: 0.6;
+}
+
+.shard2 {
+  top: 80px;
+  right: 60px;
+  width: 70px;
+  height: 90px;
+  transform: rotate(-10deg) skewY(5deg);
+  clip-path: polygon(10% 0, 100% 20%, 80% 100%, 0 80%);
+  opacity: 0.4;
+}
+
+.shard3 {
+  top: 140px;
+  right: 10px;
+  width: 60px;
+  height: 80px;
+  transform: rotate(25deg);
+  clip-path: polygon(20% 0, 100% 30%, 70% 100%, 0 70%);
+  opacity: 0.5;
+}
+
+.shard4 {
+  top: 200px;
+  right: 50px;
+  width: 50px;
+  height: 60px;
+  transform: rotate(-15deg);
+  clip-path: polygon(0 10%, 90% 0, 100% 90%, 10% 100%);
+  opacity: 0.3;
+}
+
+/* ============ CORNER MARKS GOLD ============ */
+.cornerMark {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  z-index: 3;
+}
+
+.cornerTopLeft {
+  top: 8px;
+  left: 8px;
+  border-top: 2px solid #d9b14a;
+  border-left: 2px solid #d9b14a;
+}
+
+.cornerTopRight {
+  top: 8px;
+  right: 8px;
+  border-top: 2px solid #d9b14a;
+  border-right: 2px solid #d9b14a;
+}
+
+.cornerBottomLeft {
+  bottom: 8px;
+  left: 8px;
+  border-bottom: 2px solid #d9b14a;
+  border-left: 2px solid #d9b14a;
+}
+
+.cornerBottomRight {
+  bottom: 8px;
+  right: 8px;
+  border-bottom: 2px solid #d9b14a;
+  border-right: 2px solid #d9b14a;
+}
+
+/* ============ POSITION (PG/SG/SF/PF/C) ============ */
+.position {
+  position: absolute;
+  top: 45px;
+  left: 28px;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 32px;
+  color: #ffe7a5;
+  text-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(255, 231, 165, 0.3);
+  z-index: 4;
+  letter-spacing: 2px;
+}
+
+/* ============ LOGO ÉQUIPE NBA AVEC GLOW ============ */
+.teamLogoContainer {
+  position: absolute;
+  top: 105px;
+  left: 28px;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+/* Halo lumineux principal - aura colorée intense */
+.teamGlow {
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(
+    circle,
+    var(--team-color, #00BFFF) 0%,
+    var(--team-color, #00BFFF) 20%,
+    transparent 70%
+  );
+  filter: blur(15px);
+  opacity: 0.7;
+  z-index: 1;
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* Halo secondaire pulsant - effet wow */
+.teamGlowPulse {
+  position: absolute;
+  inset: -10px;
+  background: radial-gradient(
+    circle,
+    var(--team-color, #00BFFF) 0%,
+    transparent 60%
+  );
+  filter: blur(8px);
+  opacity: 0.9;
+  z-index: 2;
+  animation: glowPulseInner 2s ease-in-out infinite;
+}
+
+/* Logo lui-même */
+.teamLogo {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  position: relative;
+  z-index: 3;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.4));
+}
+
+/* Animations */
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes glowPulseInner {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* ============ HALO DERRIÈRE PORTRAIT ============ */
+.portraitHalo {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(
+    circle,
+    rgba(0, 168, 232, 0.4) 0%,
+    rgba(0, 168, 232, 0.1) 40%,
+    transparent 70%
+  );
+  filter: blur(20px);
+  z-index: 1;
+}
+
+/* ============ PORTRAIT (PHOTO OU INITIALES) ============ */
+.portraitContainer {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 240px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  /* Masque qui fade en bas */
+  mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 65%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 65%,
+    transparent 100%
+  );
+}
+
+.portraitFallback {
+  width: 200px;
+  height: 200px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 88px;
+  color: #0a1628;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ============ VOILE DÉGRADÉ ============ */
+.veil {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(10, 22, 40, 0.4) 30%,
+    rgba(10, 22, 40, 0.9) 70%,
+    #0a1628 100%
+  );
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* ============ NOM DU JOUEUR ============ */
+.name {
+  position: absolute;
+  bottom: 165px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 36px;
+  color: #ffe7a5;
+  text-shadow: 
+    0 2px 6px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(255, 231, 165, 0.3);
+  z-index: 5;
+  letter-spacing: 2px;
+}
+
+/* ============ DIVIDER GOLD ============ */
+.divider {
+  position: absolute;
+  bottom: 145px;
+  left: 30px;
+  right: 30px;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    #d9b14a 20%,
+    #f6e7a8 50%,
+    #d9b14a 80%,
+    transparent
+  );
+  z-index: 5;
+  box-shadow: 0 0 8px rgba(217, 177, 74, 0.5);
+}
+
+/* ============ GRILLE DE STATS ============ */
+.statsGrid {
+  position: absolute;
+  bottom: 25px;
+  left: 30px;
+  right: 30px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 20px;
+  z-index: 5;
+}
+
+.statItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+}
+
+.statValue {
+  font-weight: 700;
+  font-size: 22px;
+  color: #ffe7a5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  min-width: 32px;
+}
+
+.statLabel {
+  font-weight: 600;
+  font-size: 12px;
+  color: rgba(255, 231, 165, 0.6);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ============ EFFET SHEEN (LUEUR QUI PASSE) ============ */
+.sheen {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 231, 165, 0.15) 50%,
+    transparent 70%
+  );
+  animation: sheenSweep 6s infinite;
+  z-index: 6;
+  pointer-events: none;
+}
+
+@keyframes sheenSweep {
+  0%, 70% {
+    left: -100%;
+  }
+  100% {
+    left: 200%;
+  }
+}

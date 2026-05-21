@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Player {
+  id              String   @id @default(cuid())
+  firstName       String
+  lastName        String
+  nickname        String?
+  number          Int?
+  position        String?
+  photo           String?  @db.Text
+  avatar          String
+  nbaTeam         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+  sessionPlayers  SessionPlayer[]
+}
+
+model Court {
+  id          String   @id @default(cuid())
+  name        String
+  spotsConfig Json
+  isDefault   Boolean  @default(false)  // ← Ajoute cette ligne
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  sessions    Session[]
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  courtId     String
+  court       Court    @relation(fields: [courtId], references: [id])
+  date        DateTime @default(now())  // Date de la session
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  status      String   @default("active") // active, completed
+  
+  sessionPlayers SessionPlayer[]
+}
+
+model SessionPlayer {
+  id          String   @id @default(cuid())
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  playerId    String
+  player      Player   @relation(fields: [playerId], references: [id])
+  totalPoints Int      @default(0)
+  rank        Int?
+  
+  spotResults SpotResult[]
+  
+  @@unique([sessionId, playerId])
+}
+
+model SpotResult {
+  id              String        @id @default(cuid())
+  sessionPlayerId String
+  sessionPlayer   SessionPlayer @relation(fields: [sessionPlayerId], references: [id], onDelete: Cascade)
+  spotNum         Int           // 1-10
+  spotLabel       String        // "45° MID", "FACE 3PTS"
+  spotSub         String        // "DROITE", "GAUCHE", "CENTRE"
+  makes           Int           // 0-10
+  ftMakes         Int           // 0-2
+  points          Int           // makes * ftMakes
+  createdAt       DateTime      @default(now())
+}
