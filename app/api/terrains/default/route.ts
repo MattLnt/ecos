@@ -8,34 +8,31 @@ export async function GET() {
     let court = await prisma.court.findFirst();
 
     if (!court) {
-      // Créer terrain par défaut avec les 10 spots actuels
+      // Créer terrain par défaut avec les 10 spots officiels NBA
       court = await prisma.court.create({
         data: {
           name: 'Terrain ECOS',
-          spotsConfig: JSON.stringify({
-            spots: [
-              { num: 1, x: 150, y: 150, label: 'AILE GAUCHE MID', sub: 'Mid-range gauche' },
-              { num: 2, x: 450, y: 150, label: '0° MID — DROITE', sub: 'Mid-range droit' },
-              { num: 3, x: 150, y: 450, label: 'CORNER GAUCHE 3PTS', sub: '3 points coin gauche' },
-              { num: 4, x: 450, y: 450, label: 'CORNER DROIT 3PTS', sub: '3 points coin droit' },
-              { num: 5, x: 300, y: 100, label: 'TOP KEY MID', sub: 'Haut de raquette' },
-              { num: 6, x: 300, y: 500, label: 'BASELINE MID', sub: 'Ligne de fond' },
-              { num: 7, x: 100, y: 300, label: 'AILE 45° 3PTS', sub: '3 points 45° gauche' },
-              { num: 8, x: 500, y: 300, label: 'AILE 45° 3PTS', sub: '3 points 45° droit' },
-              { num: 9, x: 300, y: 200, label: 'ELBOW GAUCHE', sub: 'Coude gauche' },
-              { num: 10, x: 300, y: 400, label: 'ELBOW DROIT', sub: 'Coude droit' },
-            ],
-          }),
+          isDefault: true,
+          spotsConfig: [
+            { id: 'b-r',  num: 1,  label: '0° MID',     sub: 'DROITE', x: 38.5, y: 6.5,  zone: 'mid' },
+            { id: 'c-r',  num: 2,  label: '0° 3 PTS',   sub: 'DROITE', x: 48.2, y: 4.0,  zone: '3pt' },
+            { id: 'el-r', num: 3,  label: '45° MID',    sub: 'DROITE', x: 36.5, y: 17.0, zone: 'mid' },
+            { id: 'w-r',  num: 4,  label: '45° 3 PTS',  sub: 'DROITE', x: 40.5, y: 24.5, zone: '3pt' },
+            { id: 'ft',   num: 5,  label: 'LANCER FRANC', sub: '15 FT', x: 23.5, y: 19.5, zone: 'mid' },
+            { id: 'top',  num: 6,  label: '90° 3 PTS',  sub: 'CENTRE', x: 25,   y: 30.4, zone: '3pt' },
+            { id: 'el-l', num: 7,  label: '45° MID',    sub: 'GAUCHE', x: 13.5, y: 17.0, zone: 'mid' },
+            { id: 'w-l',  num: 8,  label: '45° 3 PTS',  sub: 'GAUCHE', x: 9.5,  y: 24.5, zone: '3pt' },
+            { id: 'b-l',  num: 9,  label: '0° MID',     sub: 'GAUCHE', x: 11.5, y: 6.5,  zone: 'mid' },
+            { id: 'c-l',  num: 10, label: '0° 3 PTS',   sub: 'GAUCHE', x: 1.8,  y: 4.0,  zone: '3pt' },
+          ],
         },
       });
     }
 
-    const spotsConfig = JSON.parse(court.spotsConfig);
-
     return NextResponse.json({
       id: court.id,
       name: court.name,
-      spots: spotsConfig.spots,
+      spots: court.spotsConfig,
     });
   } catch (error) {
     console.error('Erreur GET terrain:', error);
@@ -56,16 +53,14 @@ export async function PUT(request: Request) {
     const updated = await prisma.court.update({
       where: { id: court.id },
       data: {
-        spotsConfig: JSON.stringify({ spots }),
+        spotsConfig: spots,
       },
     });
-
-    const spotsConfig = JSON.parse(updated.spotsConfig);
 
     return NextResponse.json({
       id: updated.id,
       name: updated.name,
-      spots: spotsConfig.spots,
+      spots: updated.spotsConfig,
     });
   } catch (error) {
     console.error('Erreur PUT terrain:', error);
