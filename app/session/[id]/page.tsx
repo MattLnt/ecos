@@ -75,7 +75,6 @@ export default function SessionPage() {
 
       setSession(data);
       
-      // Initialiser les scores
       const initialScores: Record<string, Record<string, SpotScore>> = {};
       data.sessionPlayers.forEach((sp: SessionPlayer) => {
         initialScores[sp.id] = {};
@@ -168,16 +167,12 @@ export default function SessionPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [mode, handleMakes, handleFt]);
 
-  // Construire la liste des spots à afficher
-  // - En mode shooting : 10 spots numérotés
-  // - En mode validating : UNIQUEMENT le LF au centre (focus maximal)
   const spotsToRender = useMemo<AnySpot[]>(() => {
     if (!session) return [];
     const baseSpots = session.court.spotsConfig as AnySpot[];
     return mode === 'validating' ? [LF_SPOT] : baseSpots;
   }, [session, mode]);
 
-  // Construire renderStates pour le composant Court
   const renderStates = useMemo<Record<string, SpotScore | null>>(() => {
     if (!session) return {};
     const currentSessionPlayer = session.sessionPlayers[currentPlayerIndex];
@@ -199,55 +194,80 @@ export default function SessionPage() {
   const currentPlayer = currentSessionPlayer.player;
 
   return (
-    <div className="h-screen bg-gradient-to-br from-[#0A1628] via-[#0d1f38] to-[#0A1628] flex flex-col overflow-hidden">
-      {/* Header */}
-      <header className="px-8 py-4 border-b border-[rgba(0,191,255,0.1)] backdrop-blur-sm bg-[rgba(0,191,255,0.02)] shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <div>
-              <h1 className="text-xl font-extrabold text-[#F5F1E8] tracking-wide">SESSION EN COURS</h1>
-              <p className="font-mono text-[10px] text-[rgba(245,241,232,0.35)] uppercase tracking-widest mt-1">
+    <div className="min-h-screen lg:h-screen bg-gradient-to-br from-[#0A1628] via-[#0d1f38] to-[#0A1628] flex flex-col lg:overflow-hidden">
+      
+      {/* ============ HEADER ============ */}
+      <header className="px-3 sm:px-6 lg:px-8 py-3 lg:py-4 border-b border-[rgba(0,191,255,0.1)] backdrop-blur-sm bg-[rgba(0,191,255,0.02)] shrink-0">
+        <div className="flex items-center justify-between gap-3">
+          
+          {/* Info session */}
+          <div className="flex items-center gap-3 lg:gap-8 min-w-0 flex-1">
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base lg:text-xl font-extrabold text-[#F5F1E8] tracking-wide truncate">
+                SESSION EN COURS
+              </h1>
+              <p className="font-mono text-[9px] sm:text-[10px] text-[rgba(245,241,232,0.35)] uppercase tracking-widest mt-0.5 lg:mt-1">
                 Spot {currentSpotIndex + 1} / {session.court.spotsConfig.length}
               </p>
             </div>
             
-            <div className="h-10 w-px bg-[rgba(0,191,255,0.15)]" />
+            <div className="hidden lg:block h-10 w-px bg-[rgba(0,191,255,0.15)]" />
             
-            <div className="flex items-center gap-3 px-4 py-2 bg-[rgba(0,191,255,0.08)] rounded-full border border-[rgba(0,191,255,0.15)]">
+            {/* Joueur actuel */}
+            <div className="flex items-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 py-1.5 lg:py-2 bg-[rgba(0,191,255,0.08)] rounded-full border border-[rgba(0,191,255,0.15)] flex-shrink-0">
               {currentPlayer.photo ? (
-                <img src={currentPlayer.photo} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-[#00BFFF]" />
+                <img src={currentPlayer.photo} alt="" className="w-7 h-7 lg:w-8 lg:h-8 rounded-full object-cover ring-2 ring-[#00BFFF]" />
               ) : (
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-[#0A1628] ring-2 ring-[#00BFFF]" style={{ backgroundColor: currentPlayer.avatar }}>
+                <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-[10px] lg:text-xs font-bold text-[#0A1628] ring-2 ring-[#00BFFF]" style={{ backgroundColor: currentPlayer.avatar }}>
                   {currentPlayer.firstName[0]}{currentPlayer.lastName[0]}
                 </div>
               )}
-              <span className="font-bold text-[#F5F1E8] pr-2">{currentPlayer.firstName}</span>
+              <span className="text-sm lg:text-base font-bold text-[#F5F1E8] pr-1 lg:pr-2 truncate max-w-[80px] sm:max-w-none">
+                {currentPlayer.firstName}
+              </span>
             </div>
           </div>
 
-          {/* Progress dots */}
-          <div className="flex items-center gap-2">
+          {/* Progress dots - cachés sur mobile */}
+          <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
             {session.court.spotsConfig.map((_, idx) => (
               <div
                 key={idx}
                 className={`h-1.5 rounded-full transition-all ${
                   idx < currentSpotIndex 
-                    ? 'w-8 bg-[#00BFFF]' 
+                    ? 'w-6 lg:w-8 bg-[#00BFFF]' 
                     : idx === currentSpotIndex 
-                    ? 'w-12 bg-[#00BFFF]' 
-                    : 'w-6 bg-[rgba(0,191,255,0.15)]'
+                    ? 'w-10 lg:w-12 bg-[#00BFFF]' 
+                    : 'w-4 lg:w-6 bg-[rgba(0,191,255,0.15)]'
                 }`}
               />
             ))}
           </div>
         </div>
+
+        {/* Progress bar mobile (remplace les dots) */}
+        <div className="md:hidden mt-2 flex items-center gap-1">
+          {session.court.spotsConfig.map((_, idx) => (
+            <div
+              key={idx}
+              className={`flex-1 h-1 rounded-full transition-all ${
+                idx < currentSpotIndex 
+                  ? 'bg-[#00BFFF]' 
+                  : idx === currentSpotIndex 
+                  ? 'bg-[#00BFFF]' 
+                  : 'bg-[rgba(0,191,255,0.15)]'
+              }`}
+            />
+          ))}
+        </div>
       </header>
 
-      {/* Main Layout */}
-      <main className="flex-1 grid grid-cols-[1.2fr_0.8fr] gap-8 px-8 min-h-0 mobile:grid-cols-1 mobile:p-4">
-        {/* Terrain */}
-        <div className="flex items-center justify-center py-8 mobile:order-1">
-          <div className="w-[75%] h-[75%] max-w-full max-h-full">
+      {/* ============ MAIN LAYOUT ============ */}
+      <main className="flex-1 flex flex-col lg:grid lg:grid-cols-[1.2fr_0.8fr] lg:gap-8 lg:px-8 lg:min-h-0">
+        
+        {/* ============ TERRAIN ============ */}
+        <div className="flex items-center justify-center px-3 py-3 sm:py-4 lg:py-8 order-1">
+          <div className="w-full max-w-md lg:max-w-none lg:w-[75%] lg:h-[75%]">
             <Court
               spots={spotsToRender}
               theme="hardwood"
@@ -260,16 +280,17 @@ export default function SessionPage() {
           </div>
         </div>
 
-        {/* Panel Actions */}
-        <div className="flex flex-col gap-5 min-h-0 py-8 mobile:order-2 mobile:py-4">
+        {/* ============ PANEL ACTIONS ============ */}
+        <div className="flex flex-col gap-3 sm:gap-4 lg:gap-5 min-h-0 px-3 lg:px-0 pb-4 lg:py-8 order-2">
+          
           {/* Card Spot Info */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[rgba(0,191,255,0.12)] to-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.2)] p-6 backdrop-blur-sm shrink-0">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[rgba(0,191,255,0.12)] to-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.2)] p-4 sm:p-5 lg:p-6 backdrop-blur-sm shrink-0">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#00BFFF] opacity-5 blur-3xl rounded-full" />
             <div className="relative">
-              <div className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-2">
+              <div className="font-mono text-[9px] sm:text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-1.5 lg:mb-2">
                 {mode === 'validating' ? 'Validation · Lancers Francs' : currentSpot.sub}
               </div>
-              <div className="text-3xl font-extrabold text-[#F5F1E8] tracking-tight">
+              <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#F5F1E8] tracking-tight">
                 {mode === 'validating' ? `${currentMakes} / 10` : currentSpot.label}
               </div>
             </div>
@@ -277,17 +298,17 @@ export default function SessionPage() {
 
           {/* Shooting Buttons */}
           {mode === 'shooting' && (
-            <div className="flex-1 rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-6 backdrop-blur-sm min-h-0 flex flex-col">
-              <div className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-4 shrink-0">
+            <div className="flex-1 rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-3 sm:p-4 lg:p-6 backdrop-blur-sm min-h-0 flex flex-col">
+              <div className="font-mono text-[9px] sm:text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-3 lg:mb-4 shrink-0">
                 Paniers Réussis
               </div>
-              <div className="flex-1 grid grid-cols-5 gap-2.5 content-start mobile:grid-cols-6">
+              <div className="flex-1 grid grid-cols-5 gap-2 sm:gap-2.5 content-start">
                 {Array.from({ length: 10 }, (_, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => handleMakes(i)}
-                    className="aspect-square rounded-xl bg-[rgba(0,191,255,0.06)] border border-[rgba(0,191,255,0.15)] text-[#F5F1E8] font-bold text-xl hover:bg-[rgba(0,191,255,0.15)] hover:border-[#00BFFF] hover:scale-105 active:scale-95 transition-all"
+                    className="aspect-square rounded-xl bg-[rgba(0,191,255,0.06)] border border-[rgba(0,191,255,0.15)] text-[#F5F1E8] font-bold text-lg sm:text-xl hover:bg-[rgba(0,191,255,0.15)] hover:border-[#00BFFF] active:scale-95 transition-all touch-manipulation"
                   >
                     {i}
                   </button>
@@ -295,7 +316,7 @@ export default function SessionPage() {
                 <button
                   type="button"
                   onClick={() => handleMakes(10)}
-                  className="col-span-5 rounded-xl bg-[#00BFFF] text-[#0A1628] font-extrabold text-2xl hover:shadow-[0_0_40px_rgba(0,191,255,0.4)] hover:scale-[1.02] active:scale-95 transition-all mobile:col-span-6"
+                  className="col-span-5 py-3 sm:py-4 rounded-xl bg-[#00BFFF] text-[#0A1628] font-extrabold text-xl sm:text-2xl hover:shadow-[0_0_40px_rgba(0,191,255,0.4)] active:scale-95 transition-all touch-manipulation"
                 >
                   10
                 </button>
@@ -305,48 +326,48 @@ export default function SessionPage() {
 
           {/* Validation LF */}
           {mode === 'validating' && (
-            <div className="flex-1 rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-6 backdrop-blur-sm min-h-0 flex flex-col">
-              <div className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-4 shrink-0">
+            <div className="flex-1 rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-3 sm:p-4 lg:p-6 backdrop-blur-sm min-h-0 flex flex-col">
+              <div className="font-mono text-[9px] sm:text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-3 lg:mb-4 shrink-0">
                 Multiplicateur
               </div>
-              <div className="flex-1 grid grid-cols-3 gap-4 content-center">
+              <div className="flex-1 grid grid-cols-3 gap-2 sm:gap-3 lg:gap-4 content-center">
                 {[0, 1, 2].map((ft) => (
                   <button
                     key={ft}
                     type="button"
                     onClick={() => handleFt(ft)}
-                    className="aspect-square rounded-xl bg-[rgba(0,191,255,0.06)] border border-[rgba(0,191,255,0.15)] hover:bg-[rgba(0,191,255,0.15)] hover:border-[#00BFFF] hover:scale-105 active:scale-95 transition-all flex flex-col items-center justify-center"
+                    className="aspect-square rounded-xl bg-[rgba(0,191,255,0.06)] border border-[rgba(0,191,255,0.15)] hover:bg-[rgba(0,191,255,0.15)] hover:border-[#00BFFF] active:scale-95 transition-all flex flex-col items-center justify-center touch-manipulation"
                   >
-                    <div className="text-5xl font-extrabold text-[#F5F1E8] leading-none">
-                      {ft}<span className="text-2xl opacity-40">/2</span>
+                    <div className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#F5F1E8] leading-none">
+                      {ft}<span className="text-lg sm:text-xl lg:text-2xl opacity-40">/2</span>
                     </div>
-                    <div className="font-mono text-xs text-[rgba(245,241,232,0.4)] mt-3">×{ft}</div>
+                    <div className="font-mono text-[10px] sm:text-xs text-[rgba(245,241,232,0.4)] mt-2 lg:mt-3">×{ft}</div>
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Scores */}
-          <div className="rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-5 backdrop-blur-sm shrink-0 max-h-[280px] flex flex-col">
-            <div className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-3 shrink-0">
+          {/* Scores / Classement */}
+          <div className="rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-3 sm:p-4 lg:p-5 backdrop-blur-sm shrink-0 max-h-[200px] sm:max-h-[240px] lg:max-h-[280px] flex flex-col">
+            <div className="font-mono text-[9px] sm:text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-2 lg:mb-3 shrink-0">
               Classement
             </div>
-            <div className="space-y-1.5 overflow-y-auto pr-1">
+            <div className="space-y-1 sm:space-y-1.5 overflow-y-auto pr-1">
               {session.sessionPlayers.map((sp, idx) => {
                 const total = Object.values(scores[sp.id] || {}).reduce((sum, s) => sum + s.points, 0);
                 const isActive = idx === currentPlayerIndex;
                 return (
                   <div 
                     key={sp.id} 
-                    className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all shrink-0 ${
+                    className={`flex items-center justify-between px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg transition-all shrink-0 ${
                       isActive ? 'bg-[rgba(0,191,255,0.15)] border border-[rgba(0,191,255,0.3)]' : 'bg-[rgba(0,191,255,0.02)] border border-transparent'
                     }`}
                   >
-                    <span className={`text-sm font-bold ${isActive ? 'text-[#00BFFF]' : 'text-[rgba(245,241,232,0.7)]'}`}>
+                    <span className={`text-xs sm:text-sm font-bold truncate ${isActive ? 'text-[#00BFFF]' : 'text-[rgba(245,241,232,0.7)]'}`}>
                       {sp.player.firstName}
                     </span>
-                    <span className="font-mono text-lg font-extrabold text-[#00BFFF]">{total}</span>
+                    <span className="font-mono text-base sm:text-lg font-extrabold text-[#00BFFF] ml-2">{total}</span>
                   </div>
                 );
               })}
