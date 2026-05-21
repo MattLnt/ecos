@@ -16,6 +16,7 @@ interface PlayerProfile {
   lastName: string;
   photo: string | null;
   avatar: string;
+  nbaTeam: string | null;
   totalSessions: number;
   totalPoints: number;
   avgPoints: number;
@@ -96,10 +97,14 @@ export default function PlayerProfilePage() {
         lastName={player.lastName}
         photo={player.photo}
         avatar={player.avatar}
+        nbaTeam={player.nbaTeam}
         totalSessions={player.totalSessions}
         victories={player.victories}
         avgPoints={player.avgPoints}
         bestScore={player.bestScore}
+        midRate={player.midRate}
+        threePointRate={player.threePointRate}
+        ftRate={player.ftRate}
       />
 
       <MainStats

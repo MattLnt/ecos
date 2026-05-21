@@ -128,6 +128,7 @@ export async function GET(
       lastName: player.lastName,
       photo: player.photo,
       avatar: player.avatar,
+      nbaTeam: player.nbaTeam,
       totalSessions,
       totalPoints,
       avgPoints: Math.round(avgPoints * 10) / 10,
