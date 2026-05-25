@@ -24,7 +24,6 @@ export default function StatsPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loadingDates, setLoadingDates] = useState(false);
 
-  // Charger les jours avec sessions quand on passe en mode 'date'
   useEffect(() => {
     if (viewMode === 'date' && Object.keys(sessionsByDay).length === 0) {
       fetchSessionDates();
@@ -39,7 +38,6 @@ export default function StatsPage() {
       const data = await res.json();
       setSessionsByDay(data);
 
-      // Auto-sélectionne le jour le plus récent
       const days = Object.keys(data).sort().reverse();
       if (days.length > 0) {
         setSelectedDate(days[0]);
@@ -102,7 +100,7 @@ export default function StatsPage() {
 
       {/* ===== MODE PAR DATE ===== */}
       {viewMode === 'date' && (
-        <div className="space-y-6">
+        <div>
           {loadingDates ? (
             <div className="h-64 flex items-center justify-center">
               <div className="text-[rgba(245,241,232,0.35)] text-sm">Chargement du calendrier...</div>
@@ -112,20 +110,30 @@ export default function StatsPage() {
               <p className="text-[rgba(245,241,232,0.55)]">Aucune session enregistrée</p>
             </div>
           ) : (
-            <>
-              <StatsCalendar
-                sessionsByDay={sessionsByDay}
-                selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
-              />
-
-              {selectedDate && sessionsByDay[selectedDate] && (
-                <DateFilteredStats
+            <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 items-start">
+              {/* Colonne gauche : calendrier (sticky sur desktop) */}
+              <div className="lg:sticky lg:top-6">
+                <StatsCalendar
+                  sessionsByDay={sessionsByDay}
                   selectedDate={selectedDate}
-                  sessionsOfDay={sessionsByDay[selectedDate]}
+                  onSelectDate={setSelectedDate}
                 />
-              )}
-            </>
+              </div>
+
+              {/* Colonne droite : stats filtrées */}
+              <div>
+                {selectedDate && sessionsByDay[selectedDate] ? (
+                  <DateFilteredStats
+                    selectedDate={selectedDate}
+                    sessionsOfDay={sessionsByDay[selectedDate]}
+                  />
+                ) : (
+                  <div className="bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-12 text-center">
+                    <p className="text-[rgba(245,241,232,0.55)]">Sélectionnez un jour dans le calendrier</p>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}

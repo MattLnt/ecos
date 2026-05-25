@@ -16,19 +16,17 @@ interface StatsCalendarProps {
 }
 
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+const DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
 export function StatsCalendar({ sessionsByDay, selectedDate, onSelectDate }: StatsCalendarProps) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  // Premier jour du mois + nombre de jours
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1);
   const lastDayOfMonth = new Date(viewYear, viewMonth + 1, 0);
   const daysInMonth = lastDayOfMonth.getDate();
 
-  // Décalage : lundi = 0
   let startOffset = firstDayOfMonth.getDay() - 1;
   if (startOffset < 0) startOffset = 6;
 
@@ -59,37 +57,37 @@ export function StatsCalendar({ sessionsByDay, selectedDate, onSelectDate }: Sta
   ];
 
   return (
-    <div className="bg-gradient-to-br from-[rgba(0,191,255,0.06)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-4 sm:p-6">
+    <div className="bg-gradient-to-br from-[rgba(0,191,255,0.06)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-xl p-3">
       {/* Header navigation */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <button
           onClick={prevMonth}
-          className="w-9 h-9 flex items-center justify-center rounded-lg bg-[rgba(0,191,255,0.08)] border border-[rgba(0,191,255,0.15)] text-[#00BFFF] hover:bg-[rgba(0,191,255,0.15)] active:scale-95 transition-all"
+          className="w-7 h-7 flex items-center justify-center rounded-md bg-[rgba(0,191,255,0.08)] text-[#00BFFF] hover:bg-[rgba(0,191,255,0.15)] active:scale-95 transition-all"
         >
-          <ChevronLeft size={18} />
+          <ChevronLeft size={14} />
         </button>
-        <div className="text-base sm:text-lg font-bold text-[#F5F1E8]">
+        <div className="text-sm font-bold text-[#F5F1E8]">
           {MONTHS[viewMonth]} {viewYear}
         </div>
         <button
           onClick={nextMonth}
-          className="w-9 h-9 flex items-center justify-center rounded-lg bg-[rgba(0,191,255,0.08)] border border-[rgba(0,191,255,0.15)] text-[#00BFFF] hover:bg-[rgba(0,191,255,0.15)] active:scale-95 transition-all"
+          className="w-7 h-7 flex items-center justify-center rounded-md bg-[rgba(0,191,255,0.08)] text-[#00BFFF] hover:bg-[rgba(0,191,255,0.15)] active:scale-95 transition-all"
         >
-          <ChevronRight size={18} />
+          <ChevronRight size={14} />
         </button>
       </div>
 
       {/* Jours de la semaine */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
-        {DAYS.map((d) => (
-          <div key={d} className="text-center text-[10px] sm:text-xs font-bold text-[rgba(245,241,232,0.35)] uppercase py-1">
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {DAYS.map((d, i) => (
+          <div key={i} className="text-center text-[10px] font-bold text-[rgba(245,241,232,0.35)]">
             {d}
           </div>
         ))}
       </div>
 
       {/* Grille des jours */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-2">
+      <div className="grid grid-cols-7 gap-1">
         {cells.map((day, idx) => {
           if (day === null) return <div key={`empty-${idx}`} />;
 
@@ -107,16 +105,15 @@ export function StatsCalendar({ sessionsByDay, selectedDate, onSelectDate }: Sta
               key={key}
               onClick={() => hasSessions && onSelectDate(key)}
               disabled={!hasSessions}
-              className={`relative aspect-square rounded-lg flex flex-col items-center justify-center text-sm font-bold transition-all ${
+              className={`relative aspect-square rounded-md flex flex-col items-center justify-center text-xs font-bold transition-all ${
                 isSelected
-                  ? 'bg-[#00BFFF] text-[#0A1628] shadow-lg shadow-[rgba(0,191,255,0.4)]'
+                  ? 'bg-[#00BFFF] text-[#0A1628]'
                   : hasSessions
-                  ? 'bg-[rgba(0,191,255,0.12)] text-[#F5F1E8] hover:bg-[rgba(0,191,255,0.25)] cursor-pointer border border-[rgba(0,191,255,0.25)]'
+                  ? 'bg-[rgba(0,191,255,0.12)] text-[#F5F1E8] hover:bg-[rgba(0,191,255,0.25)] cursor-pointer'
                   : 'text-[rgba(245,241,232,0.25)] cursor-default'
               } ${isToday && !isSelected ? 'ring-1 ring-[rgba(0,191,255,0.4)]' : ''}`}
             >
-              <span>{day}</span>
-              {/* Indicateur nombre de sessions */}
+              <span className="leading-none">{day}</span>
               {hasSessions && (
                 <div className="flex gap-0.5 mt-0.5">
                   {Array.from({ length: Math.min(sessionCount, 3) }, (_, i) => (
@@ -135,14 +132,14 @@ export function StatsCalendar({ sessionsByDay, selectedDate, onSelectDate }: Sta
       </div>
 
       {/* Légende */}
-      <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[rgba(0,191,255,0.1)]">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-[rgba(0,191,255,0.25)] border border-[rgba(0,191,255,0.25)]" />
-          <span className="text-[10px] sm:text-xs text-[rgba(245,241,232,0.55)]">Jour avec sessions</span>
+      <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[rgba(0,191,255,0.1)]">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded bg-[rgba(0,191,255,0.25)]" />
+          <span className="text-[10px] text-[rgba(245,241,232,0.55)]">Sessions</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <div className="w-1 h-1 rounded-full bg-[#00BFFF]" />
-          <span className="text-[10px] sm:text-xs text-[rgba(245,241,232,0.55)]">= 1 session</span>
+          <span className="text-[10px] text-[rgba(245,241,232,0.55)]">= 1 session</span>
         </div>
       </div>
     </div>
