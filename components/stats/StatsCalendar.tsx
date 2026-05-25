@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 interface SessionInfo {
   sessionId: string;
   time: string;
+  startedAt: string;
   playerCount: number;
 }
 

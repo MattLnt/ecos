@@ -6,6 +6,7 @@ import { Trophy, TrendingDown, Target, Crosshair } from 'lucide-react';
 interface SessionInfo {
   sessionId: string;
   time: string;
+  startedAt: string;
   playerCount: number;
 }
 
@@ -51,12 +52,10 @@ interface DateFilteredStatsProps {
 }
 
 export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredStatsProps) {
-  // 'all' = toutes les sessions du jour, sinon un sessionId
   const [selectedSession, setSelectedSession] = useState<string>('all');
   const [data, setData] = useState<DateStatsData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Reset le choix de session quand on change de date
   useEffect(() => {
     setSelectedSession('all');
   }, [selectedDate]);
@@ -83,7 +82,6 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
     }
   };
 
-  // Formatage de la date pour affichage
   const dateLabel = new Date(`${selectedDate}T12:00:00`).toLocaleDateString('fr-FR', {
     weekday: 'long',
     day: 'numeric',
@@ -98,7 +96,6 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
         <div className="text-sm text-[rgba(245,241,232,0.55)] mb-1">Statistiques du</div>
         <div className="text-lg sm:text-xl font-bold text-[#F5F1E8] capitalize mb-4">{dateLabel}</div>
 
-        {/* Sélecteur : toutes les sessions OU une session */}
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setSelectedSession('all')}
@@ -242,12 +239,10 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
                       </div>
                     </div>
 
-                    {/* Mobile : juste les points */}
                     <div className="sm:hidden font-mono text-lg font-extrabold text-[#00BFFF]">
                       {player.totalPoints}
                     </div>
 
-                    {/* Desktop : toutes les colonnes */}
                     <div className="hidden sm:block font-mono text-lg font-extrabold text-[#00BFFF]">
                       {player.totalPoints}
                     </div>
