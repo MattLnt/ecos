@@ -1,6 +1,26 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Helpers de classification
+const isMid = (label: string) => label?.includes('MID') && !label?.includes('LANCER FRANC');
+const isThree = (label: string) => label?.includes('3 PTS') || label?.includes('3PTS');
+
+interface PlayerAcc {
+  playerId: string;
+  firstName: string;
+  lastName: string;
+  photo: string | null;
+  avatar: string;
+  midTotal: number;
+  midMakes: number;
+  threeTotal: number;
+  threeMakes: number;
+  ftTotal: number;
+  ftMakes: number;
+  spotStats: Record<number, { total: number; makes: number }>;
+  spotNames: Record<number, { label: string; sub: string }>;
+}
+
 export async function GET() {
   try {
     const sessionPlayers = await prisma.sessionPlayer.findMany({
@@ -13,10 +33,9 @@ export async function GET() {
       },
     });
 
-    // Grouper par joueur
     const playerStats = sessionPlayers.reduce((acc, sp) => {
       const playerId = sp.playerId;
-      
+
       if (!acc[playerId]) {
         acc[playerId] = {
           playerId: sp.player.id,
@@ -30,17 +49,17 @@ export async function GET() {
           threeMakes: 0,
           ftTotal: 0,
           ftMakes: 0,
-          spotStats: {} as Record<number, { total: number; makes: number }>,
-          spotNames: {} as Record<number, { label: string; sub: string }>,
+          spotStats: {},
+          spotNames: {},
         };
       }
-      
+
       sp.spotResults.forEach(sr => {
-        // Stats générales
-        if (sr.spotLabel.includes('MID')) {
+        // Stats générales - FILTRE CORRIGÉ
+        if (isMid(sr.spotLabel)) {
           acc[playerId].midTotal += 10;
           acc[playerId].midMakes += sr.makes;
-        } else if (sr.spotLabel.includes('3PTS')) {
+        } else if (isThree(sr.spotLabel)) {
           acc[playerId].threeTotal += 10;
           acc[playerId].threeMakes += sr.makes;
         }
@@ -55,15 +74,14 @@ export async function GET() {
         acc[playerId].spotStats[sr.spotNum].total += 10;
         acc[playerId].spotStats[sr.spotNum].makes += sr.makes;
       });
-      
-      return acc;
-    }, {} as Record<string, any>);
 
-    // Calculer les taux
-    const playersArray = Object.values(playerStats).map((player: any) => {
+      return acc;
+    }, {} as Record<string, PlayerAcc>);
+
+    const playersArray = Object.values(playerStats).map((player) => {
       const spotRates: Record<number, number> = {};
-      
-      Object.entries(player.spotStats).forEach(([spotNum, stats]: [string, any]) => {
+
+      Object.entries(player.spotStats).forEach(([spotNum, stats]) => {
         spotRates[parseInt(spotNum)] = (stats.makes / stats.total) * 100;
       });
 
