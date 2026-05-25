@@ -13,6 +13,7 @@ import { DateFilteredStats } from '@/components/stats/DateFilteredStats';
 interface SessionInfo {
   sessionId: string;
   time: string;
+  startedAt: string;
   playerCount: number;
 }
 
