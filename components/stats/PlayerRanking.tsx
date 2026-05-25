@@ -17,6 +17,9 @@ interface PlayerStat {
 
 type GeneralKey = 'midRate' | 'threePointRate' | 'ftRate';
 
+// Helper de classification
+const isThreeLabel = (label: string) => label?.includes('3 PTS') || label?.includes('3PTS');
+
 export function PlayerRanking() {
   const [players, setPlayers] = useState<PlayerStat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,8 +67,7 @@ export function PlayerRanking() {
     const spot = spotOptions.find(s => s.num === spotNum);
     if (!spot) return '#00BFFF';
     
-    if (spot.label.includes('MID')) return '#00BFFF';
-    if (spot.label.includes('3PTS')) return '#FFD700';
+    if (isThreeLabel(spot.label)) return '#FFD700';
     return '#00BFFF';
   };
 
@@ -85,7 +87,6 @@ export function PlayerRanking() {
       <div className="space-y-4">
         <h3 className="text-sm font-bold text-[rgba(245,241,232,0.7)]">Statistiques générales</h3>
         
-        {/* Filtres boutons */}
         <div className="flex items-center gap-3 mobile:overflow-x-auto mobile:pb-2">
           <button
             onClick={() => setGeneralFilter('midRate')}
@@ -121,7 +122,6 @@ export function PlayerRanking() {
           </button>
         </div>
 
-        {/* Tableau stats générales */}
         <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl overflow-hidden">
           <div className="grid grid-cols-[60px_1fr_120px_120px_120px] gap-4 p-4 border-b border-[rgba(0,191,255,0.15)] bg-[rgba(0,191,255,0.04)] mobile:hidden">
             <div className="text-xs font-bold text-[rgba(245,241,232,0.35)] uppercase">#</div>
@@ -183,12 +183,10 @@ export function PlayerRanking() {
       <div className="space-y-4">
         <h3 className="text-sm font-bold text-[rgba(245,241,232,0.7)]">Par spot</h3>
         
-        {/* Filtres boutons avec scroll horizontal */}
         <div className="overflow-x-auto pb-2 -mx-2 px-2">
           <div className="flex items-center gap-2 min-w-max">
             {spotOptions.map((spot) => {
-              const color = spot.label.includes('MID') ? '#00BFFF' : 
-                           spot.label.includes('3PTS') ? '#FFD700' : '#00BFFF';
+              const color = isThreeLabel(spot.label) ? '#FFD700' : '#00BFFF';
               const isActive = spotFilter === spot.num;
               
               return (
@@ -211,7 +209,6 @@ export function PlayerRanking() {
           </div>
         </div>
 
-        {/* Tableau par spot */}
         {spotFilter !== '' && (
           <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl overflow-hidden">
             <div className="grid grid-cols-[60px_1fr_150px] gap-4 p-4 border-b border-[rgba(0,191,255,0.15)] bg-[rgba(0,191,255,0.04)] mobile:hidden">

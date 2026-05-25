@@ -7,6 +7,7 @@ interface SpotStat {
   spotNum: number;
   spotLabel: string;
   spotSub: string;
+  fullLabel?: string;
   successRate: number;
 }
 
@@ -38,6 +39,21 @@ export function SpotPerformance() {
     );
   }
 
+  if (spots.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-[#F5F1E8]">Performances par spot</h2>
+        <div className="bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-12 text-center">
+          <p className="text-[rgba(245,241,232,0.55)]">Aucune donnée disponible</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Helper : label complet avec côté
+  const getFullLabel = (spot: SpotStat) =>
+    spot.fullLabel || `${spot.spotLabel} ${spot.spotSub}`.trim();
+
   const bestSpot = spots.reduce((best, spot) => spot.successRate > best.successRate ? spot : best, spots[0]);
   const worstSpot = spots.reduce((worst, spot) => spot.successRate < worst.successRate ? spot : worst, spots[0]);
 
@@ -54,7 +70,7 @@ export function SpotPerformance() {
             </div>
             <div>
               <div className="text-sm text-[rgba(245,241,232,0.55)]">Meilleur spot</div>
-              <div className="font-bold text-[#F5F1E8]">{bestSpot?.spotLabel}</div>
+              <div className="font-bold text-[#F5F1E8]">{bestSpot ? getFullLabel(bestSpot) : '—'}</div>
             </div>
           </div>
           <div className="font-mono text-4xl font-extrabold text-green-400">
@@ -69,7 +85,7 @@ export function SpotPerformance() {
             </div>
             <div>
               <div className="text-sm text-[rgba(245,241,232,0.55)]">À améliorer</div>
-              <div className="font-bold text-[#F5F1E8]">{worstSpot?.spotLabel}</div>
+              <div className="font-bold text-[#F5F1E8]">{worstSpot ? getFullLabel(worstSpot) : '—'}</div>
             </div>
           </div>
           <div className="font-mono text-4xl font-extrabold text-red-400">
@@ -78,7 +94,7 @@ export function SpotPerformance() {
         </div>
       </div>
 
-      {/* Heatmap des 10 spots - SIMPLIFIÉ */}
+      {/* Heatmap des 10 spots */}
       <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-6">
         <h3 className="text-lg font-bold text-[#F5F1E8] mb-4">Taux de réussite par spot</h3>
         <div className="grid grid-cols-5 gap-3 mobile:grid-cols-2">
@@ -102,7 +118,7 @@ export function SpotPerformance() {
               <div className="text-xs text-[rgba(245,241,232,0.7)] font-semibold">
                 {spot.spotLabel}
               </div>
-              <div className="text-[10px] text-[rgba(245,241,232,0.35)] mt-1">
+              <div className="text-[10px] text-[rgba(245,241,232,0.35)] mt-1 uppercase tracking-wide">
                 {spot.spotSub}
               </div>
             </div>
