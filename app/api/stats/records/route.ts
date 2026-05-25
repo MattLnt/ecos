@@ -1,37 +1,25 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+interface FtAcc {
+  totalAttempts: number;
+  totalMakes: number;
+}
+
 export async function GET() {
   try {
-    // Meilleur score
     const bestScoreResult = await prisma.sessionPlayer.findFirst({
-      where: {
-        session: { status: 'completed' },
-      },
-      orderBy: {
-        totalPoints: 'desc',
-      },
-      include: {
-        player: true,
-        session: true,
-      },
+      where: { session: { status: 'completed' } },
+      orderBy: { totalPoints: 'desc' },
+      include: { player: true, session: true },
     });
 
-    // Pire score
     const worstScoreResult = await prisma.sessionPlayer.findFirst({
-      where: {
-        session: { status: 'completed' },
-      },
-      orderBy: {
-        totalPoints: 'asc',
-      },
-      include: {
-        player: true,
-        session: true,
-      },
+      where: { session: { status: 'completed' } },
+      orderBy: { totalPoints: 'asc' },
+      include: { player: true, session: true },
     });
 
-    // Séries de victoires
     const allSessions = await prisma.session.findMany({
       where: { status: 'completed' },
       orderBy: { date: 'asc' },
@@ -67,7 +55,6 @@ export async function GET() {
       }
     });
 
-    // Meilleur taux LF
     const spotResults = await prisma.spotResult.findMany({
       where: {
         sessionPlayer: {
@@ -83,22 +70,22 @@ export async function GET() {
 
     const ftStats = spotResults.reduce((acc, result) => {
       const playerName = result.sessionPlayer.player.firstName;
-      
+
       if (!acc[playerName]) {
         acc[playerName] = { totalAttempts: 0, totalMakes: 0 };
       }
-      
+
       acc[playerName].totalAttempts += 2;
       acc[playerName].totalMakes += result.ftMakes;
-      
+
       return acc;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, FtAcc>);
 
     let bestFtRate = 0;
     let bestFtPlayer = '';
     let bestFtAttempts = 0;
 
-    Object.entries(ftStats).forEach(([playerName, stats]: [string, any]) => {
+    Object.entries(ftStats).forEach(([playerName, stats]) => {
       const rate = (stats.totalMakes / stats.totalAttempts) * 100;
       if (rate > bestFtRate && stats.totalAttempts >= 20) {
         bestFtRate = rate;

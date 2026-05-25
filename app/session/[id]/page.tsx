@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Court } from '@/components/shooting/Court';
 import { LF_SPOT } from '@/components/shooting/constants';
+import { Undo2 } from 'lucide-react';
 import type { AnySpot, SpotScore } from '@/components/shooting/types';
 
 interface Player {
@@ -42,6 +43,15 @@ interface Session {
   sessionPlayers: SessionPlayer[];
 }
 
+// Historique pour le retour arrière
+interface HistoryEntry {
+  spotIndex: number;
+  playerIndex: number;
+  mode: 'shooting' | 'validating';
+  currentMakes: number | null;
+  savedScore?: { sessionPlayerId: string; spotId: string; previous: SpotScore } | null;
+}
+
 export default function SessionPage() {
   const params = useParams();
   const router = useRouter();
@@ -56,6 +66,9 @@ export default function SessionPage() {
   const [currentMakes, setCurrentMakes] = useState<number | null>(null);
   
   const [scores, setScores] = useState<Record<string, Record<string, SpotScore>>>({});
+  
+  // Historique des actions pour le retour arrière
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
     fetchSession();
@@ -94,9 +107,19 @@ export default function SessionPage() {
 
   const handleMakes = useCallback((makes: number) => {
     if (!session || mode !== 'shooting') return;
+    
+    // Sauvegarde l'état AVANT de changer
+    setHistory((prev) => [...prev, {
+      spotIndex: currentSpotIndex,
+      playerIndex: currentPlayerIndex,
+      mode: 'shooting',
+      currentMakes: null,
+      savedScore: null,
+    }]);
+    
     setCurrentMakes(makes);
     setMode('validating');
-  }, [session, mode]);
+  }, [session, mode, currentSpotIndex, currentPlayerIndex]);
 
   const handleFt = useCallback(async (ftMakes: number) => {
     if (!session || mode !== 'validating' || currentMakes === null) return;
@@ -104,6 +127,22 @@ export default function SessionPage() {
     const currentSessionPlayer = session.sessionPlayers[currentPlayerIndex];
     const currentSpot = session.court.spotsConfig[currentSpotIndex];
     const points = currentMakes * ftMakes;
+
+    // Sauvegarde l'état AVANT (avec l'ancien score pour pouvoir le restaurer)
+    const previousScore = scores[currentSessionPlayer.id]?.[currentSpot.id] 
+      || { makes: null, ftMakes: null, points: 0 };
+    
+    setHistory((prev) => [...prev, {
+      spotIndex: currentSpotIndex,
+      playerIndex: currentPlayerIndex,
+      mode: 'validating',
+      currentMakes,
+      savedScore: {
+        sessionPlayerId: currentSessionPlayer.id,
+        spotId: currentSpot.id,
+        previous: previousScore,
+      },
+    }]);
 
     try {
       await fetch(`/api/sessions/${sessionId}/spot-result`, {
@@ -149,13 +188,49 @@ export default function SessionPage() {
 
     setCurrentMakes(null);
     setMode('shooting');
-  }, [session, mode, currentMakes, currentPlayerIndex, currentSpotIndex, sessionId, router]);
+  }, [session, mode, currentMakes, currentPlayerIndex, currentSpotIndex, sessionId, router, scores]);
+
+  // ⏪ RETOUR ARRIÈRE
+  const handleUndo = useCallback(() => {
+    if (history.length === 0) return;
+
+    const last = history[history.length - 1];
+
+    // Restaure l'état précédent
+    setCurrentSpotIndex(last.spotIndex);
+    setCurrentPlayerIndex(last.playerIndex);
+    setMode(last.mode);
+    setCurrentMakes(last.currentMakes);
+
+    // Si on annule une validation, on restaure l'ancien score
+    if (last.savedScore) {
+      const { sessionPlayerId, spotId, previous } = last.savedScore;
+      setScores((prev) => ({
+        ...prev,
+        [sessionPlayerId]: {
+          ...prev[sessionPlayerId],
+          [spotId]: previous,
+        },
+      }));
+    }
+
+    // Retire la dernière entrée de l'historique
+    setHistory((prev) => prev.slice(0, -1));
+  }, [history]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       
       const k = e.key;
+      
+      // Backspace ou Échap pour annuler
+      if (k === 'Backspace' || k === 'Escape') {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+      
       if (mode === 'shooting') {
         if (/^[0-9]$/.test(k)) { e.preventDefault(); handleMakes(parseInt(k, 10)); }
         else if (k === '+' || k === '=' || k === 't' || k === 'T') { e.preventDefault(); handleMakes(10); }
@@ -165,7 +240,7 @@ export default function SessionPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mode, handleMakes, handleFt]);
+  }, [mode, handleMakes, handleFt, handleUndo]);
 
   const spotsToRender = useMemo<AnySpot[]>(() => {
     if (!session) return [];
@@ -192,6 +267,7 @@ export default function SessionPage() {
   const currentSessionPlayer = session.sessionPlayers[currentPlayerIndex];
   const currentSpot = session.court.spotsConfig[currentSpotIndex];
   const currentPlayer = currentSessionPlayer.player;
+  const canUndo = history.length > 0;
 
   return (
     <div className="min-h-screen lg:h-screen bg-gradient-to-br from-[#0A1628] via-[#0d1f38] to-[#0A1628] flex flex-col lg:overflow-hidden">
@@ -228,20 +304,37 @@ export default function SessionPage() {
             </div>
           </div>
 
-          {/* Progress dots - cachés sur mobile */}
-          <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
-            {session.court.spotsConfig.map((_, idx) => (
-              <div
-                key={idx}
-                className={`h-1.5 rounded-full transition-all ${
-                  idx < currentSpotIndex 
-                    ? 'w-6 lg:w-8 bg-[#00BFFF]' 
-                    : idx === currentSpotIndex 
-                    ? 'w-10 lg:w-12 bg-[#00BFFF]' 
-                    : 'w-4 lg:w-6 bg-[rgba(0,191,255,0.15)]'
-                }`}
-              />
-            ))}
+          {/* Bouton RETOUR + Progress dots */}
+          <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
+            {/* Bouton Retour */}
+            <button
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                canUndo
+                  ? 'bg-[rgba(255,180,0,0.15)] border border-[rgba(255,180,0,0.35)] text-[#FFB400] hover:bg-[rgba(255,180,0,0.25)] active:scale-95'
+                  : 'bg-[rgba(245,241,232,0.04)] border border-[rgba(245,241,232,0.08)] text-[rgba(245,241,232,0.25)] cursor-not-allowed'
+              }`}
+            >
+              <Undo2 size={16} />
+              <span className="hidden sm:inline">Retour</span>
+            </button>
+
+            {/* Progress dots - desktop */}
+            <div className="hidden md:flex items-center gap-1.5 lg:gap-2">
+              {session.court.spotsConfig.map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`h-1.5 rounded-full transition-all ${
+                    idx < currentSpotIndex 
+                      ? 'w-6 lg:w-8 bg-[#00BFFF]' 
+                      : idx === currentSpotIndex 
+                      ? 'w-10 lg:w-12 bg-[#00BFFF]' 
+                      : 'w-4 lg:w-6 bg-[rgba(0,191,255,0.15)]'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -251,11 +344,7 @@ export default function SessionPage() {
             <div
               key={idx}
               className={`flex-1 h-1 rounded-full transition-all ${
-                idx < currentSpotIndex 
-                  ? 'bg-[#00BFFF]' 
-                  : idx === currentSpotIndex 
-                  ? 'bg-[#00BFFF]' 
-                  : 'bg-[rgba(0,191,255,0.15)]'
+                idx <= currentSpotIndex ? 'bg-[#00BFFF]' : 'bg-[rgba(0,191,255,0.15)]'
               }`}
             />
           ))}

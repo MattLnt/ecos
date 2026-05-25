@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+interface PlayerAcc {
+  playerId: string;
+  firstName: string;
+  lastName: string;
+  photo: string | null;
+  avatar: string;
+  totalSessions: number;
+  totalPoints: number;
+  victories: number;
+  bestScore: number;
+  scores: number[];
+}
+
 export async function GET() {
   try {
     const sessionPlayers = await prisma.sessionPlayer.findMany({
@@ -12,19 +25,16 @@ export async function GET() {
         session: {
           include: {
             sessionPlayers: {
-              orderBy: {
-                totalPoints: 'desc',
-              },
+              orderBy: { totalPoints: 'desc' },
             },
           },
         },
       },
     });
 
-    // Grouper par joueur
     const playerStats = sessionPlayers.reduce((acc, sp) => {
       const playerId = sp.playerId;
-      
+
       if (!acc[playerId]) {
         acc[playerId] = {
           playerId: sp.player.id,
@@ -39,26 +49,24 @@ export async function GET() {
           scores: [],
         };
       }
-      
+
       acc[playerId].totalSessions += 1;
       acc[playerId].totalPoints += sp.totalPoints;
       acc[playerId].scores.push(sp.totalPoints);
-      
+
       if (sp.totalPoints > acc[playerId].bestScore) {
         acc[playerId].bestScore = sp.totalPoints;
       }
-      
-      // Vérifier si c'est une victoire (1er du classement)
+
       const isWinner = sp.session.sessionPlayers[0]?.id === sp.id;
       if (isWinner) {
         acc[playerId].victories += 1;
       }
-      
-      return acc;
-    }, {} as Record<string, any>);
 
-    // Calculer moyenne
-    const playersArray = Object.values(playerStats).map((player: any) => ({
+      return acc;
+    }, {} as Record<string, PlayerAcc>);
+
+    const playersArray = Object.values(playerStats).map((player) => ({
       playerId: player.playerId,
       firstName: player.firstName,
       lastName: player.lastName,

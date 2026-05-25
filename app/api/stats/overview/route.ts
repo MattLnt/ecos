@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Helpers de classification des spots
+const isMid = (label: string) => label?.includes('MID') && !label?.includes('LANCER FRANC');
+const isThree = (label: string) => label?.includes('3 PTS') || label?.includes('3PTS');
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || '7d';
 
-    // Total sessions
     const totalSessions = await prisma.session.count({
       where: { status: 'completed' },
     });
 
-    // Récupérer tous les spotResults
     const spotResults = await prisma.spotResult.findMany({
       where: {
         sessionPlayer: {
@@ -20,28 +22,25 @@ export async function GET(request: Request) {
       },
     });
 
-    // Identifier spots mid vs 3pts (basé sur le label)
-    const midSpots = spotResults.filter(r => r.spotLabel.includes('MID'));
-    const threePointSpots = spotResults.filter(r => r.spotLabel.includes('3PTS'));
+    // Identifier spots mid vs 3pts
+    const midSpots = spotResults.filter(r => isMid(r.spotLabel));
+    const threePointSpots = spotResults.filter(r => isThree(r.spotLabel));
 
-    // Calculer taux mid-range
     const midAttempts = midSpots.length * 10;
     const midMakes = midSpots.reduce((sum, r) => sum + r.makes, 0);
     const midRate = midAttempts > 0 ? (midMakes / midAttempts) * 100 : 0;
 
-    // Calculer taux 3 points
     const threeAttempts = threePointSpots.length * 10;
     const threeMakes = threePointSpots.reduce((sum, r) => sum + r.makes, 0);
     const threePointRate = threeAttempts > 0 ? (threeMakes / threeAttempts) * 100 : 0;
 
-    // Calculer taux lancers francs
     const ftAttempts = spotResults.length * 2;
     const ftMakes = spotResults.reduce((sum, r) => sum + r.ftMakes, 0);
     const ftRate = ftAttempts > 0 ? (ftMakes / ftAttempts) * 100 : 0;
 
     // Évolution selon période
     const now = new Date();
-    let startDate = new Date();
+    const startDate = new Date();
     let groupBy: 'day' | 'week' | 'month' = 'day';
 
     switch (period) {
@@ -77,28 +76,19 @@ export async function GET(request: Request) {
         startDate.setDate(now.getDate() - 7);
     }
 
-    // Récupérer sessions dans la période
     const sessions = await prisma.session.findMany({
       where: {
         status: 'completed',
-        date: {
-          gte: startDate,
-          lte: now,
-        },
+        date: { gte: startDate, lte: now },
       },
       include: {
         sessionPlayers: {
-          include: {
-            spotResults: true,
-          },
+          include: { spotResults: true },
         },
       },
-      orderBy: {
-        date: 'asc',
-      },
+      orderBy: { date: 'asc' },
     });
 
-    // Grouper par période
     const dataByPeriod = new Map<string, { midTotal: number; midMakes: number; threeTotal: number; threeMakes: number; ftTotal: number; ftMakes: number }>();
 
     sessions.forEach((session) => {
@@ -121,10 +111,10 @@ export async function GET(request: Request) {
 
       session.sessionPlayers.forEach(sp => {
         sp.spotResults.forEach(sr => {
-          if (sr.spotLabel.includes('MID')) {
+          if (isMid(sr.spotLabel)) {
             current.midTotal += 10;
             current.midMakes += sr.makes;
-          } else if (sr.spotLabel.includes('3PTS')) {
+          } else if (isThree(sr.spotLabel)) {
             current.threeTotal += 10;
             current.threeMakes += sr.makes;
           }
@@ -134,7 +124,6 @@ export async function GET(request: Request) {
       });
     });
 
-    // Calculer les taux
     const evolution = Array.from(dataByPeriod.entries()).map(([date, data]) => ({
       date,
       midRate: data.midTotal > 0 ? Math.round((data.midMakes / data.midTotal) * 1000) / 10 : 0,
