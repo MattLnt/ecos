@@ -51,6 +51,8 @@ interface HistoryEntry {
   savedScore?: { sessionPlayerId: string; spotId: string; previous: SpotScore } | null;
 }
 
+const LOCK_MARKER = '__ecos_session_lock__';
+
 export default function SessionPage() {
   const params = useParams();
   const router = useRouter();
@@ -68,9 +70,8 @@ export default function SessionPage() {
   
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
-  // Refs pour éviter les stale closures dans les listeners
   const historyRef = useRef<HistoryEntry[]>([]);
-  const ignorePopstateRef = useRef(false);
+  const allowLeaveRef = useRef(false);
 
   useEffect(() => {
     historyRef.current = history;
@@ -137,39 +138,40 @@ export default function SessionPage() {
     });
   }, []);
 
-  // ====== INTERCEPTION DU BOUTON RETOUR TÉLÉPHONE / NAVIGATEUR ======
+  // ====== INTERCEPTION DU BOUTON RETOUR (Android Chrome compatible) ======
   useEffect(() => {
     if (!session) return;
 
-    // Marqueur unique pour identifier notre state
-    const LOCK_STATE = { sessionLock: true, id: sessionId };
+    // Push le state initial une seule fois au montage
+    // On utilise replaceState pour marquer notre état actuel comme "lock"
+    if (window.history.state?.marker !== LOCK_MARKER) {
+      window.history.pushState({ marker: LOCK_MARKER, ts: Date.now() }, '');
+    }
 
-    // On pousse notre state initial pour créer un "buffer"
-    window.history.pushState(LOCK_STATE, '');
-
-    const handlePopState = () => {
-      // Si on a demandé d'ignorer (vraie navigation autorisée)
-      if (ignorePopstateRef.current) {
-        ignorePopstateRef.current = false;
+    const handlePopState = (event: PopStateEvent) => {
+      // Vraie sortie autorisée (fin de session)
+      if (allowLeaveRef.current) {
         return;
       }
 
-      // IMMÉDIATEMENT re-pousser un state pour reprendre le contrôle
-      // (avant même de traiter l'undo, pour éviter que 2 back rapides sortent)
-      window.history.pushState(LOCK_STATE, '');
+      // On re-pousse IMMÉDIATEMENT un nouveau state pour garder le contrôle
+      // Ça doit être fait AVANT toute autre opération async
+      window.history.pushState({ marker: LOCK_MARKER, ts: Date.now() }, '');
 
-      // Il y a des actions à annuler → on annule
+      // Ensuite on décide quoi faire
       if (historyRef.current.length > 0) {
+        // Il y a une action à annuler
         handleUndo();
       } else {
-        // Rien à annuler → confirmation avant de quitter
-        const confirmLeave = window.confirm('Quitter la session en cours ?');
-        if (confirmLeave) {
-          ignorePopstateRef.current = true;
-          // On fait 2 back pour sortir vraiment (car on a 2 states à consommer)
-          window.history.go(-2);
-        }
-        // Si pas confirmé → on reste, notre push précédent nous garde ici
+        // Rien à annuler → confirmation
+        // On utilise setTimeout pour laisser le navigateur enregistrer notre pushState
+        setTimeout(() => {
+          const confirmLeave = window.confirm('Quitter la session en cours ?');
+          if (confirmLeave) {
+            allowLeaveRef.current = true;
+            router.push('/home');
+          }
+        }, 0);
       }
     };
 
@@ -179,7 +181,7 @@ export default function SessionPage() {
       window.removeEventListener('popstate', handlePopState);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, sessionId]);
+  }, [session]);
 
   const handleMakes = useCallback((makes: number) => {
     if (!session || mode !== 'shooting') return;
@@ -251,7 +253,7 @@ export default function SessionPage() {
       
       if (nextSpotIndex >= session.court.spotsConfig.length) {
         // Fin de session : on autorise la navigation
-        ignorePopstateRef.current = true;
+        allowLeaveRef.current = true;
         router.push(`/session/${sessionId}/results`);
         return;
       }
@@ -319,7 +321,6 @@ export default function SessionPage() {
   return (
     <div className="min-h-screen lg:h-screen bg-gradient-to-br from-[#0A1628] via-[#0d1f38] to-[#0A1628] flex flex-col lg:overflow-hidden">
       
-      {/* ============ HEADER ============ */}
       <header className="px-3 sm:px-6 lg:px-8 py-3 lg:py-4 border-b border-[rgba(0,191,255,0.1)] backdrop-blur-sm bg-[rgba(0,191,255,0.02)] shrink-0">
         <div className="flex items-center justify-between gap-3">
           
@@ -392,7 +393,6 @@ export default function SessionPage() {
         </div>
       </header>
 
-      {/* ============ MAIN LAYOUT ============ */}
       <main className="flex-1 flex flex-col lg:grid lg:grid-cols-[1.2fr_0.8fr] lg:gap-8 lg:px-8 lg:min-h-0">
         
         <div className="flex items-center justify-center px-3 py-3 sm:py-4 lg:py-8 order-1">
