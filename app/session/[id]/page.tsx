@@ -111,35 +111,65 @@ export default function SessionPage() {
     }
   };
 
+  const handleUndo = useCallback(() => {
+    setHistory((prev) => {
+      if (prev.length === 0) return prev;
+
+      const last = prev[prev.length - 1];
+
+      setCurrentSpotIndex(last.spotIndex);
+      setCurrentPlayerIndex(last.playerIndex);
+      setMode(last.mode);
+      setCurrentMakes(last.currentMakes);
+
+      if (last.savedScore) {
+        const { sessionPlayerId, spotId, previous } = last.savedScore;
+        setScores((s) => ({
+          ...s,
+          [sessionPlayerId]: {
+            ...s[sessionPlayerId],
+            [spotId]: previous,
+          },
+        }));
+      }
+
+      return prev.slice(0, -1);
+    });
+  }, []);
+
   // ====== INTERCEPTION DU BOUTON RETOUR TÉLÉPHONE / NAVIGATEUR ======
   useEffect(() => {
     if (!session) return;
 
-    // On pousse un state initial pour "verrouiller" la page
-    window.history.pushState({ sessionLock: true }, '');
+    // Marqueur unique pour identifier notre state
+    const LOCK_STATE = { sessionLock: true, id: sessionId };
 
-    const handlePopState = (e: PopStateEvent) => {
-      // Si on a demandé d'ignorer (pour vraiment quitter), on laisse passer
+    // On pousse notre state initial pour créer un "buffer"
+    window.history.pushState(LOCK_STATE, '');
+
+    const handlePopState = () => {
+      // Si on a demandé d'ignorer (vraie navigation autorisée)
       if (ignorePopstateRef.current) {
         ignorePopstateRef.current = false;
         return;
       }
 
-      // Il y a des actions à annuler → on annule au lieu de quitter
+      // IMMÉDIATEMENT re-pousser un state pour reprendre le contrôle
+      // (avant même de traiter l'undo, pour éviter que 2 back rapides sortent)
+      window.history.pushState(LOCK_STATE, '');
+
+      // Il y a des actions à annuler → on annule
       if (historyRef.current.length > 0) {
         handleUndo();
-        // On re-push un state pour rester sur la page
-        window.history.pushState({ sessionLock: true }, '');
       } else {
-        // Rien à annuler → on demande confirmation avant de quitter
+        // Rien à annuler → confirmation avant de quitter
         const confirmLeave = window.confirm('Quitter la session en cours ?');
         if (confirmLeave) {
           ignorePopstateRef.current = true;
-          router.push('/home');
-        } else {
-          // On re-push pour rester sur la page
-          window.history.pushState({ sessionLock: true }, '');
+          // On fait 2 back pour sortir vraiment (car on a 2 states à consommer)
+          window.history.go(-2);
         }
+        // Si pas confirmé → on reste, notre push précédent nous garde ici
       }
     };
 
@@ -149,7 +179,7 @@ export default function SessionPage() {
       window.removeEventListener('popstate', handlePopState);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, sessionId]);
 
   const handleMakes = useCallback((makes: number) => {
     if (!session || mode !== 'shooting') return;
@@ -235,32 +265,6 @@ export default function SessionPage() {
     setCurrentMakes(null);
     setMode('shooting');
   }, [session, mode, currentMakes, currentPlayerIndex, currentSpotIndex, sessionId, router, scores]);
-
-  const handleUndo = useCallback(() => {
-    setHistory((prev) => {
-      if (prev.length === 0) return prev;
-
-      const last = prev[prev.length - 1];
-
-      setCurrentSpotIndex(last.spotIndex);
-      setCurrentPlayerIndex(last.playerIndex);
-      setMode(last.mode);
-      setCurrentMakes(last.currentMakes);
-
-      if (last.savedScore) {
-        const { sessionPlayerId, spotId, previous } = last.savedScore;
-        setScores((s) => ({
-          ...s,
-          [sessionPlayerId]: {
-            ...s[sessionPlayerId],
-            [spotId]: previous,
-          },
-        }));
-      }
-
-      return prev.slice(0, -1);
-    });
-  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
