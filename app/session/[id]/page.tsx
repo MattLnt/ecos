@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Court } from '@/components/shooting/Court';
 import { LF_SPOT } from '@/components/shooting/constants';
-import { Undo2 } from 'lucide-react';
+import { Undo2, X } from 'lucide-react';
 import type { AnySpot, SpotScore } from '@/components/shooting/types';
 
 interface Player {
@@ -51,8 +51,6 @@ interface HistoryEntry {
   savedScore?: { sessionPlayerId: string; spotId: string; previous: SpotScore } | null;
 }
 
-const LOCK_MARKER = '__ecos_session_lock__';
-
 export default function SessionPage() {
   const params = useParams();
   const router = useRouter();
@@ -70,12 +68,10 @@ export default function SessionPage() {
   
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
-  const historyRef = useRef<HistoryEntry[]>([]);
+  // Modal de confirmation pour quitter
+  const [showQuitModal, setShowQuitModal] = useState(false);
+  
   const allowLeaveRef = useRef(false);
-
-  useEffect(() => {
-    historyRef.current = history;
-  }, [history]);
 
   useEffect(() => {
     fetchSession();
@@ -112,6 +108,33 @@ export default function SessionPage() {
     }
   };
 
+  // ====== BLOCAGE TOTAL DU BOUTON RETOUR ======
+  useEffect(() => {
+    if (!session) return;
+
+    // On pousse plusieurs states d'un coup au démarrage pour créer un buffer solide
+    // Ça évite qu'un back sorte de la page
+    for (let i = 0; i < 50; i++) {
+      window.history.pushState({ sessionLock: true, i }, '');
+    }
+
+    const handlePopState = () => {
+      // Si sortie autorisée (fin de session ou bouton Quitter)
+      if (allowLeaveRef.current) {
+        return;
+      }
+
+      // Sinon on re-pousse immédiatement pour bloquer
+      window.history.pushState({ sessionLock: true }, '');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [session]);
+
   const handleUndo = useCallback(() => {
     setHistory((prev) => {
       if (prev.length === 0) return prev;
@@ -138,50 +161,10 @@ export default function SessionPage() {
     });
   }, []);
 
-  // ====== INTERCEPTION DU BOUTON RETOUR (Android Chrome compatible) ======
-  useEffect(() => {
-    if (!session) return;
-
-    // Push le state initial une seule fois au montage
-    // On utilise replaceState pour marquer notre état actuel comme "lock"
-    if (window.history.state?.marker !== LOCK_MARKER) {
-      window.history.pushState({ marker: LOCK_MARKER, ts: Date.now() }, '');
-    }
-
-    const handlePopState = (event: PopStateEvent) => {
-      // Vraie sortie autorisée (fin de session)
-      if (allowLeaveRef.current) {
-        return;
-      }
-
-      // On re-pousse IMMÉDIATEMENT un nouveau state pour garder le contrôle
-      // Ça doit être fait AVANT toute autre opération async
-      window.history.pushState({ marker: LOCK_MARKER, ts: Date.now() }, '');
-
-      // Ensuite on décide quoi faire
-      if (historyRef.current.length > 0) {
-        // Il y a une action à annuler
-        handleUndo();
-      } else {
-        // Rien à annuler → confirmation
-        // On utilise setTimeout pour laisser le navigateur enregistrer notre pushState
-        setTimeout(() => {
-          const confirmLeave = window.confirm('Quitter la session en cours ?');
-          if (confirmLeave) {
-            allowLeaveRef.current = true;
-            router.push('/home');
-          }
-        }, 0);
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  const handleQuitConfirm = () => {
+    allowLeaveRef.current = true;
+    router.push('/home');
+  };
 
   const handleMakes = useCallback((makes: number) => {
     if (!session || mode !== 'shooting') return;
@@ -321,10 +304,22 @@ export default function SessionPage() {
   return (
     <div className="min-h-screen lg:h-screen bg-gradient-to-br from-[#0A1628] via-[#0d1f38] to-[#0A1628] flex flex-col lg:overflow-hidden">
       
+      {/* ============ HEADER ============ */}
       <header className="px-3 sm:px-6 lg:px-8 py-3 lg:py-4 border-b border-[rgba(0,191,255,0.1)] backdrop-blur-sm bg-[rgba(0,191,255,0.02)] shrink-0">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2 sm:gap-3">
           
-          <div className="flex items-center gap-3 lg:gap-8 min-w-0 flex-1">
+          {/* Bouton QUITTER + Info session */}
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-6 min-w-0 flex-1">
+            {/* Bouton Quitter (X rouge discret) */}
+            <button
+              onClick={() => setShowQuitModal(true)}
+              className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.25)] text-red-400 hover:bg-[rgba(239,68,68,0.2)] active:scale-95 transition-all"
+              aria-label="Quitter la session"
+              title="Quitter la session"
+            >
+              <X size={18} />
+            </button>
+
             <div className="min-w-0">
               <h1 className="text-sm sm:text-base lg:text-xl font-extrabold text-[#F5F1E8] tracking-wide truncate">
                 SESSION EN COURS
@@ -336,7 +331,8 @@ export default function SessionPage() {
             
             <div className="hidden lg:block h-10 w-px bg-[rgba(0,191,255,0.15)]" />
             
-            <div className="flex items-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 py-1.5 lg:py-2 bg-[rgba(0,191,255,0.08)] rounded-full border border-[rgba(0,191,255,0.15)] flex-shrink-0">
+            {/* Joueur actuel */}
+            <div className="hidden sm:flex items-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 py-1.5 lg:py-2 bg-[rgba(0,191,255,0.08)] rounded-full border border-[rgba(0,191,255,0.15)] flex-shrink-0">
               {currentPlayer.photo ? (
                 <img src={currentPlayer.photo} alt="" className="w-7 h-7 lg:w-8 lg:h-8 rounded-full object-cover ring-2 ring-[#00BFFF]" />
               ) : (
@@ -350,18 +346,19 @@ export default function SessionPage() {
             </div>
           </div>
 
+          {/* Bouton RETOUR (visible aussi sur mobile maintenant) */}
           <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
             <button
               onClick={handleUndo}
               disabled={!canUndo}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                 canUndo
                   ? 'bg-[rgba(255,180,0,0.15)] border border-[rgba(255,180,0,0.35)] text-[#FFB400] hover:bg-[rgba(255,180,0,0.25)] active:scale-95'
                   : 'bg-[rgba(245,241,232,0.04)] border border-[rgba(245,241,232,0.08)] text-[rgba(245,241,232,0.25)] cursor-not-allowed'
               }`}
             >
               <Undo2 size={16} />
-              <span className="hidden sm:inline">Retour</span>
+              <span>Retour</span>
             </button>
 
             <div className="hidden md:flex items-center gap-1.5 lg:gap-2">
@@ -381,6 +378,21 @@ export default function SessionPage() {
           </div>
         </div>
 
+        {/* Joueur actuel MOBILE (sous le header) */}
+        <div className="sm:hidden mt-2 flex items-center gap-2 px-2 py-1.5 bg-[rgba(0,191,255,0.08)] rounded-full border border-[rgba(0,191,255,0.15)] w-fit">
+          {currentPlayer.photo ? (
+            <img src={currentPlayer.photo} alt="" className="w-6 h-6 rounded-full object-cover ring-2 ring-[#00BFFF]" />
+          ) : (
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-[#0A1628] ring-2 ring-[#00BFFF]" style={{ backgroundColor: currentPlayer.avatar }}>
+              {currentPlayer.firstName[0]}{currentPlayer.lastName[0]}
+            </div>
+          )}
+          <span className="text-xs font-bold text-[#F5F1E8] pr-1 truncate">
+            {currentPlayer.firstName}
+          </span>
+        </div>
+
+        {/* Progress bar mobile */}
         <div className="md:hidden mt-2 flex items-center gap-1">
           {session.court.spotsConfig.map((_, idx) => (
             <div
@@ -393,6 +405,7 @@ export default function SessionPage() {
         </div>
       </header>
 
+      {/* ============ MAIN LAYOUT ============ */}
       <main className="flex-1 flex flex-col lg:grid lg:grid-cols-[1.2fr_0.8fr] lg:gap-8 lg:px-8 lg:min-h-0">
         
         <div className="flex items-center justify-center px-3 py-3 sm:py-4 lg:py-8 order-1">
@@ -499,6 +512,51 @@ export default function SessionPage() {
           </div>
         </div>
       </main>
+
+      {/* ============ MODAL QUITTER ============ */}
+      {showQuitModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0A1628] border border-red-500/30 rounded-2xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-5 border-b border-red-500/20 bg-gradient-to-r from-red-500/10 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                  <X size={24} className="text-red-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-[#F5F1E8]">
+                    Quitter la session ?
+                  </h2>
+                  <p className="text-sm text-[rgba(245,241,232,0.55)] mt-0.5">
+                    La progression sera perdue
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-[#F5F1E8]">
+                Vous êtes sur le point de quitter la session en cours. Les scores enregistrés jusqu&apos;ici resteront sauvegardés, mais vous ne pourrez pas reprendre la session.
+              </p>
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 bg-[rgba(245,241,232,0.02)] border-t border-[rgba(245,241,232,0.05)]">
+              <button
+                onClick={() => setShowQuitModal(false)}
+                className="flex-1 px-4 py-2.5 bg-[rgba(245,241,232,0.08)] text-[#F5F1E8] rounded-xl font-bold text-sm hover:bg-[rgba(245,241,232,0.15)] active:scale-95 transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleQuitConfirm}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 active:scale-95 transition-all shadow-lg shadow-red-500/30"
+              >
+                <X size={16} />
+                <span>Quitter</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
