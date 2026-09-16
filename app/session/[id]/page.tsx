@@ -122,6 +122,18 @@ export default function SessionPage() {
     }
   };
 
+  // Pas de pull-to-refresh pendant une session : un geste vers le bas
+  // rechargerait la page et ferait perdre la saisie en cours. Restreint à
+  // cette page — ailleurs on garde le défilement natif de Chrome.
+  useEffect(() => {
+    const el = document.documentElement;
+    const previous = el.style.overscrollBehavior;
+    el.style.overscrollBehavior = 'none';
+    return () => {
+      el.style.overscrollBehavior = previous;
+    };
+  }, []);
+
   // ====== BLOCAGE TOTAL DU BOUTON RETOUR ======
   useEffect(() => {
     if (!session) return;

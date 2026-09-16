@@ -16,7 +16,9 @@ export function BottomBar() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[rgba(10,22,40,0.92)] border-t border-[rgba(0,191,255,0.12)] backdrop-blur-md z-50 hidden mobile:block pb-safe-b">
+    // Fond opaque plutôt que backdrop-blur : un backdrop-filter sur un élément
+    // fixe oblige Chrome à relire le fond à chaque frame pendant le scroll.
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#0A1628] border-t border-[rgba(0,191,255,0.12)] z-50 hidden mobile:block pb-safe-b">
       <div className="grid grid-cols-5 h-16">
         {navItems.map((item) => {
           const Icon = item.icon;
