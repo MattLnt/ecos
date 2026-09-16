@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Court } from '@/components/shooting/Court';
 import { LF_SPOT } from '@/components/shooting/constants';
@@ -43,7 +43,6 @@ interface Session {
   sessionPlayers: SessionPlayer[];
 }
 
-// Historique pour le retour arrière
 interface HistoryEntry {
   spotIndex: number;
   playerIndex: number;
@@ -67,8 +66,15 @@ export default function SessionPage() {
   
   const [scores, setScores] = useState<Record<string, Record<string, SpotScore>>>({});
   
-  // Historique des actions pour le retour arrière
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  
+  // Refs pour éviter les stale closures dans les listeners
+  const historyRef = useRef<HistoryEntry[]>([]);
+  const ignorePopstateRef = useRef(false);
+
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
 
   useEffect(() => {
     fetchSession();
@@ -105,10 +111,49 @@ export default function SessionPage() {
     }
   };
 
+  // ====== INTERCEPTION DU BOUTON RETOUR TÉLÉPHONE / NAVIGATEUR ======
+  useEffect(() => {
+    if (!session) return;
+
+    // On pousse un state initial pour "verrouiller" la page
+    window.history.pushState({ sessionLock: true }, '');
+
+    const handlePopState = (e: PopStateEvent) => {
+      // Si on a demandé d'ignorer (pour vraiment quitter), on laisse passer
+      if (ignorePopstateRef.current) {
+        ignorePopstateRef.current = false;
+        return;
+      }
+
+      // Il y a des actions à annuler → on annule au lieu de quitter
+      if (historyRef.current.length > 0) {
+        handleUndo();
+        // On re-push un state pour rester sur la page
+        window.history.pushState({ sessionLock: true }, '');
+      } else {
+        // Rien à annuler → on demande confirmation avant de quitter
+        const confirmLeave = window.confirm('Quitter la session en cours ?');
+        if (confirmLeave) {
+          ignorePopstateRef.current = true;
+          router.push('/home');
+        } else {
+          // On re-push pour rester sur la page
+          window.history.pushState({ sessionLock: true }, '');
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
   const handleMakes = useCallback((makes: number) => {
     if (!session || mode !== 'shooting') return;
     
-    // Sauvegarde l'état AVANT de changer
     setHistory((prev) => [...prev, {
       spotIndex: currentSpotIndex,
       playerIndex: currentPlayerIndex,
@@ -128,7 +173,6 @@ export default function SessionPage() {
     const currentSpot = session.court.spotsConfig[currentSpotIndex];
     const points = currentMakes * ftMakes;
 
-    // Sauvegarde l'état AVANT (avec l'ancien score pour pouvoir le restaurer)
     const previousScore = scores[currentSessionPlayer.id]?.[currentSpot.id] 
       || { makes: null, ftMakes: null, points: 0 };
     
@@ -176,6 +220,8 @@ export default function SessionPage() {
       const nextSpotIndex = currentSpotIndex + 1;
       
       if (nextSpotIndex >= session.court.spotsConfig.length) {
+        // Fin de session : on autorise la navigation
+        ignorePopstateRef.current = true;
         router.push(`/session/${sessionId}/results`);
         return;
       }
@@ -190,33 +236,31 @@ export default function SessionPage() {
     setMode('shooting');
   }, [session, mode, currentMakes, currentPlayerIndex, currentSpotIndex, sessionId, router, scores]);
 
-  // ⏪ RETOUR ARRIÈRE
   const handleUndo = useCallback(() => {
-    if (history.length === 0) return;
+    setHistory((prev) => {
+      if (prev.length === 0) return prev;
 
-    const last = history[history.length - 1];
+      const last = prev[prev.length - 1];
 
-    // Restaure l'état précédent
-    setCurrentSpotIndex(last.spotIndex);
-    setCurrentPlayerIndex(last.playerIndex);
-    setMode(last.mode);
-    setCurrentMakes(last.currentMakes);
+      setCurrentSpotIndex(last.spotIndex);
+      setCurrentPlayerIndex(last.playerIndex);
+      setMode(last.mode);
+      setCurrentMakes(last.currentMakes);
 
-    // Si on annule une validation, on restaure l'ancien score
-    if (last.savedScore) {
-      const { sessionPlayerId, spotId, previous } = last.savedScore;
-      setScores((prev) => ({
-        ...prev,
-        [sessionPlayerId]: {
-          ...prev[sessionPlayerId],
-          [spotId]: previous,
-        },
-      }));
-    }
+      if (last.savedScore) {
+        const { sessionPlayerId, spotId, previous } = last.savedScore;
+        setScores((s) => ({
+          ...s,
+          [sessionPlayerId]: {
+            ...s[sessionPlayerId],
+            [spotId]: previous,
+          },
+        }));
+      }
 
-    // Retire la dernière entrée de l'historique
-    setHistory((prev) => prev.slice(0, -1));
-  }, [history]);
+      return prev.slice(0, -1);
+    });
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -224,7 +268,6 @@ export default function SessionPage() {
       
       const k = e.key;
       
-      // Backspace ou Échap pour annuler
       if (k === 'Backspace' || k === 'Escape') {
         e.preventDefault();
         handleUndo();
@@ -276,7 +319,6 @@ export default function SessionPage() {
       <header className="px-3 sm:px-6 lg:px-8 py-3 lg:py-4 border-b border-[rgba(0,191,255,0.1)] backdrop-blur-sm bg-[rgba(0,191,255,0.02)] shrink-0">
         <div className="flex items-center justify-between gap-3">
           
-          {/* Info session */}
           <div className="flex items-center gap-3 lg:gap-8 min-w-0 flex-1">
             <div className="min-w-0">
               <h1 className="text-sm sm:text-base lg:text-xl font-extrabold text-[#F5F1E8] tracking-wide truncate">
@@ -289,7 +331,6 @@ export default function SessionPage() {
             
             <div className="hidden lg:block h-10 w-px bg-[rgba(0,191,255,0.15)]" />
             
-            {/* Joueur actuel */}
             <div className="flex items-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 py-1.5 lg:py-2 bg-[rgba(0,191,255,0.08)] rounded-full border border-[rgba(0,191,255,0.15)] flex-shrink-0">
               {currentPlayer.photo ? (
                 <img src={currentPlayer.photo} alt="" className="w-7 h-7 lg:w-8 lg:h-8 rounded-full object-cover ring-2 ring-[#00BFFF]" />
@@ -304,9 +345,7 @@ export default function SessionPage() {
             </div>
           </div>
 
-          {/* Bouton RETOUR + Progress dots */}
           <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
-            {/* Bouton Retour */}
             <button
               onClick={handleUndo}
               disabled={!canUndo}
@@ -320,7 +359,6 @@ export default function SessionPage() {
               <span className="hidden sm:inline">Retour</span>
             </button>
 
-            {/* Progress dots - desktop */}
             <div className="hidden md:flex items-center gap-1.5 lg:gap-2">
               {session.court.spotsConfig.map((_, idx) => (
                 <div
@@ -338,7 +376,6 @@ export default function SessionPage() {
           </div>
         </div>
 
-        {/* Progress bar mobile (remplace les dots) */}
         <div className="md:hidden mt-2 flex items-center gap-1">
           {session.court.spotsConfig.map((_, idx) => (
             <div
@@ -354,7 +391,6 @@ export default function SessionPage() {
       {/* ============ MAIN LAYOUT ============ */}
       <main className="flex-1 flex flex-col lg:grid lg:grid-cols-[1.2fr_0.8fr] lg:gap-8 lg:px-8 lg:min-h-0">
         
-        {/* ============ TERRAIN ============ */}
         <div className="flex items-center justify-center px-3 py-3 sm:py-4 lg:py-8 order-1">
           <div className="w-full max-w-md lg:max-w-none lg:w-[75%] lg:h-[75%]">
             <Court
@@ -369,10 +405,8 @@ export default function SessionPage() {
           </div>
         </div>
 
-        {/* ============ PANEL ACTIONS ============ */}
         <div className="flex flex-col gap-3 sm:gap-4 lg:gap-5 min-h-0 px-3 lg:px-0 pb-4 lg:py-8 order-2">
           
-          {/* Card Spot Info */}
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[rgba(0,191,255,0.12)] to-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.2)] p-4 sm:p-5 lg:p-6 backdrop-blur-sm shrink-0">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#00BFFF] opacity-5 blur-3xl rounded-full" />
             <div className="relative">
@@ -385,7 +419,6 @@ export default function SessionPage() {
             </div>
           </div>
 
-          {/* Shooting Buttons */}
           {mode === 'shooting' && (
             <div className="flex-1 rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-3 sm:p-4 lg:p-6 backdrop-blur-sm min-h-0 flex flex-col">
               <div className="font-mono text-[9px] sm:text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-3 lg:mb-4 shrink-0">
@@ -413,7 +446,6 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* Validation LF */}
           {mode === 'validating' && (
             <div className="flex-1 rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-3 sm:p-4 lg:p-6 backdrop-blur-sm min-h-0 flex flex-col">
               <div className="font-mono text-[9px] sm:text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-3 lg:mb-4 shrink-0">
@@ -437,7 +469,6 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* Scores / Classement */}
           <div className="rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-3 sm:p-4 lg:p-5 backdrop-blur-sm shrink-0 max-h-[200px] sm:max-h-[240px] lg:max-h-[280px] flex flex-col">
             <div className="font-mono text-[9px] sm:text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-2 lg:mb-3 shrink-0">
               Classement
