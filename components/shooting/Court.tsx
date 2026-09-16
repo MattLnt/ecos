@@ -101,9 +101,11 @@ interface SpotProps {
   isLF: boolean;
   showNumbers: boolean;
   showLabels: boolean;
+  /** Agrandit pastilles et chiffres quand le terrain est affiché petit (mobile). */
+  scale: number;
 }
 
-function Spot({ spot, score, theme, isCurrent, isLF, showNumbers, showLabels }: SpotProps) {
+function Spot({ spot, score, theme, isCurrent, isLF, showNumbers, showLabels, scale }: SpotProps) {
   const makes = score?.makes;
   const ftMakes = score?.ftMakes;
   const points = score?.points ?? 0;
@@ -124,8 +126,8 @@ function Spot({ spot, score, theme, isCurrent, isLF, showNumbers, showLabels }: 
   }
   const textColor = (done || isCurrent || isLF) ? theme.spotText : theme.spotTextEmpty;
 
-  const r = isLF ? 2.1 : 1.35;
-  const fontSize = isLF ? 1.7 : 1.25;
+  const r = (isLF ? 2.1 : 1.35) * scale;
+  const fontSize = (isLF ? 1.7 : 1.25) * scale;
 
   let centerText: string;
   if (isLF) centerText = 'LF';
@@ -137,17 +139,17 @@ function Spot({ spot, score, theme, isCurrent, isLF, showNumbers, showLabels }: 
     <g transform={`translate(${spot.x}, ${spot.y})`} data-spot-id={spot.id}>
       {(isCurrent || isLF) && (
         <circle r={r} fill="none" stroke={theme.spotFill}
-          strokeWidth={isLF ? 0.4 : 0.25} className="pulse-ring" />
+          strokeWidth={(isLF ? 0.4 : 0.25) * scale} className="pulse-ring" />
       )}
       <circle r={r} fill={fill} stroke={theme.spotStroke}
-        strokeWidth={isLF ? 0.22 : 0.16}
+        strokeWidth={(isLF ? 0.22 : 0.16) * scale}
         style={theme.glow
           ? { filter: 'drop-shadow(0 0 1.8px rgba(255,215,0,0.85))' }
           : { filter: 'drop-shadow(0 0.15px 0.4px rgba(0,0,0,0.45))' }}
       />
       {(isCurrent || isLF) && (
-        <circle r={r + (isLF ? 0.7 : 0.55)} fill="none"
-          stroke={theme.spotFill} strokeWidth={isLF ? 0.16 : 0.14} />
+        <circle r={r + (isLF ? 0.7 : 0.55) * scale} fill="none"
+          stroke={theme.spotFill} strokeWidth={(isLF ? 0.16 : 0.14) * scale} />
       )}
       <text y={fontSize * 0.36} textAnchor="middle" fill={textColor}
         fontFamily="JetBrains Mono, monospace" fontSize={fontSize}
@@ -155,9 +157,9 @@ function Spot({ spot, score, theme, isCurrent, isLF, showNumbers, showLabels }: 
         {centerText}
       </text>
       {showLabels && empty && !isLF && (
-        <text y={-1.85} textAnchor="middle" fill={theme.line}
+        <text y={-1.85 * scale} textAnchor="middle" fill={theme.line}
           opacity={isCurrent ? 0.85 : 0.45}
-          fontFamily="JetBrains Mono, monospace" fontSize={0.58}
+          fontFamily="JetBrains Mono, monospace" fontSize={0.58 * scale}
           letterSpacing="0.1em" fontWeight={isCurrent ? 700 : 500}>
           {spot.label}
         </text>
@@ -179,11 +181,18 @@ export interface CourtProps {
   showLabels?: boolean;
   showSpotNumbers?: boolean;
   brand?: string;
+  /**
+   * Facteur appliqué aux pastilles de spot. Sur un petit écran le terrain est
+   * réduit, donc on grossit les pastilles pour qu'elles restent lisibles.
+   */
+  spotScale?: number;
+  className?: string;
 }
 
 export function Court({
   spots, theme: themeKey, mode, currentNum, renderStates,
   showLabels = true, showSpotNumbers = true, brand = 'ECOS EGUILLES',
+  spotScale = 1, className = '',
 }: CourtProps) {
   const theme = COURT_THEMES[themeKey] ?? COURT_THEMES.hardwood;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -198,7 +207,7 @@ export function Court({
   return (
     <svg
       ref={svgRef}
-      className="court-svg"
+      className={`court-svg ${className}`}
       viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
       preserveAspectRatio="xMidYMid meet"
       style={{ ['--accent' as string]: theme.spotFill }}
@@ -246,6 +255,7 @@ export function Court({
               isLF={isLF}
               showNumbers={showSpotNumbers}
               showLabels={showLabels}
+              scale={spotScale}
             />
           );
         })}

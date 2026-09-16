@@ -106,9 +106,9 @@ export default function NewSessionPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8 pb-32 sm:pb-8 px-3 sm:px-0">
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8 pt-safe-t pb-[calc(8rem+env(safe-area-inset-bottom,0px))] sm:pb-8 px-3 sm:px-6">
       {/* Header */}
-      <div className="text-center pt-2 sm:pt-0">
+      <div className="text-center pt-3 sm:pt-6">
         <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-[#F5F1E8] tracking-tight mb-2 sm:mb-3">
           NOUVELLE SESSION
         </h1>
@@ -222,7 +222,7 @@ export default function NewSessionPage() {
       </div>
 
       {/* Bouton démarrer - Fixed bottom sur mobile, sticky sur desktop */}
-      <div className="fixed bottom-0 left-0 right-0 px-3 pb-4 pt-4 bg-gradient-to-t from-[#0A1628] via-[#0A1628] to-transparent sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:px-0 sm:pt-4 sm:bg-none sm:sticky sm:bottom-6 z-30">
+      <div className="fixed bottom-0 left-0 right-0 px-3 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-[#0A1628] via-[#0A1628] to-transparent sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:px-0 sm:pt-4 sm:pb-0 sm:bg-none sm:sticky sm:bottom-6 z-30">
         <button
           onClick={handleCreateSession}
           disabled={selectedPlayers.length === 0 || creating}

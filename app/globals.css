@@ -12,9 +12,12 @@
     --text-dim: rgba(245,241,232,0.55);
     --text-faint: rgba(245,241,232,0.35);
     --accent: #00BFFF;
-    
+
     --font-outfit: 'Outfit', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
+
+    /* Largeur courante de la sidebar desktop — pilotée par <Sidebar /> */
+    --sidebar-w: 260px;
   }
 
   * {
@@ -31,12 +34,23 @@
     color: var(--text);
     font-family: var(--font-outfit);
     -webkit-font-smoothing: antialiased;
+    /* Pas de pull-to-refresh ni de rebond : l'app se pilote au doigt en plein match */
+    overscroll-behavior-y: none;
   }
 
   body {
     background: radial-gradient(ellipse 90% 60% at 50% 50%, rgba(0,191,255,0.06) 0%, transparent 60%),
                 linear-gradient(180deg, #0A1628 0%, #0d1f38 100%);
-    min-height: 100vh;
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+
+  /* Sur mobile, un tap ne doit ni flasher ni déclencher le double-tap zoom */
+  button,
+  a,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   .font-mono {
@@ -61,6 +75,55 @@
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--accent);
+  }
+
+  /* Les scrollbars natives mangent de la place sur les petites zones */
+  @media (max-width: 880px) {
+    ::-webkit-scrollbar {
+      width: 3px;
+      height: 3px;
+    }
+  }
+}
+
+@layer components {
+  /* ============================================================
+     Terrain (SVG) — dimensionné par son conteneur.
+     preserveAspectRatio="xMidYMid meet" se charge du letterboxing,
+     donc le SVG peut prendre 100% de la boîte sans se déformer.
+     ============================================================ */
+  .court-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  /* Halo pulsé autour du spot courant */
+  @keyframes pulse-ring {
+    0%   { opacity: 0.6; transform: scale(1); }
+    100% { opacity: 0;   transform: scale(2.4); }
+  }
+
+  .pulse-ring {
+    animation: pulse-ring 1.6s ease-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pulse-ring {
+      animation: none;
+      opacity: 0.35;
+    }
+  }
+
+  /* Zone de scroll interne : inertie iOS + pas de propagation au document */
+  .scroll-area {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 }
 

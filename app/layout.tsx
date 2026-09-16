@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit, Oswald, Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
@@ -28,6 +28,23 @@ const barlowCondensed = Barlow_Condensed({
 export const metadata: Metadata = {
   title: "ECOS Shoots",
   description: "Application de suivi de performances basketball",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'ECOS Shoots',
+  },
+};
+
+// Le double-tap zoom parasite la saisie rapide des scores pendant une session :
+// on fige l'échelle et on passe en viewport-fit=cover pour gérer les encoches.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#0A1628',
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({

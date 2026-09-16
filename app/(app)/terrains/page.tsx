@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Edit2, Save, X } from 'lucide-react';
+import { COURT_W, COURT_H } from '@/components/shooting/constants';
 
 interface SpotConfig {
   num: number;
@@ -71,13 +72,19 @@ export default function TerrainsPage() {
   const handleDrop = (e: React.MouseEvent<HTMLDivElement>) => {
     if (draggedSpot === null) return;
 
+    // Les spots sont stockés en coordonnées terrain (0..COURT_W / 0..COURT_H),
+    // pas en pixels : on reconvertit la position du clic, sinon on écrit des
+    // pixels dans la config que la page de session relit ensuite.
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const clamp = (v: number, max: number) => Math.min(max, Math.max(0, v));
+    const x = clamp(((e.clientX - rect.left) / rect.width) * COURT_W, COURT_W);
+    const y = clamp(((e.clientY - rect.top) / rect.height) * COURT_H, COURT_H);
 
     setEditedSpots(prev =>
       prev.map(spot =>
-        spot.num === draggedSpot ? { ...spot, x, y } : spot
+        spot.num === draggedSpot
+          ? { ...spot, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }
+          : spot
       )
     );
 
@@ -97,29 +104,29 @@ export default function TerrainsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 mobile:flex-col mobile:items-stretch">
         <div>
-          <h1 className="text-4xl font-extrabold text-[#F5F1E8] tracking-tight mobile:text-3xl">
+          <h1 className="text-4xl font-extrabold text-[#F5F1E8] tracking-tight mobile:text-2xl">
             Configuration du terrain
           </h1>
-          <p className="text-[rgba(245,241,232,0.55)] mt-2">
+          <p className="text-[rgba(245,241,232,0.55)] mt-2 mobile:mt-1 mobile:text-sm">
             {isEditing ? 'Déplacez les spots sur le terrain' : 'Visualisez et modifiez les positions des spots'}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           {isEditing ? (
             <>
               <button
                 onClick={handleCancel}
-                className="px-5 py-2.5 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.2)] rounded-xl text-red-400 font-bold hover:bg-[rgba(239,68,68,0.15)] transition-all flex items-center gap-2"
+                className="flex-1 px-5 py-2.5 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.2)] rounded-xl text-red-400 font-bold hover:bg-[rgba(239,68,68,0.15)] active:scale-95 transition-all flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 <X size={18} />
                 Annuler
               </button>
               <button
                 onClick={handleSave}
-                className="px-5 py-2.5 bg-[#00BFFF] rounded-xl text-[#0A1628] font-bold hover:bg-[#00A8E8] transition-all flex items-center gap-2 shadow-lg shadow-[rgba(0,191,255,0.3)]"
+                className="flex-1 px-5 py-2.5 bg-[#00BFFF] rounded-xl text-[#0A1628] font-bold hover:bg-[#00A8E8] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[rgba(0,191,255,0.3)] whitespace-nowrap"
               >
                 <Save size={18} />
                 Enregistrer
@@ -128,7 +135,7 @@ export default function TerrainsPage() {
           ) : (
             <button
               onClick={() => setIsEditing(true)}
-              className="px-5 py-2.5 bg-[#00BFFF] rounded-xl text-[#0A1628] font-bold hover:bg-[#00A8E8] transition-all flex items-center gap-2 shadow-lg shadow-[rgba(0,191,255,0.3)]"
+              className="flex-1 px-5 py-2.5 bg-[#00BFFF] rounded-xl text-[#0A1628] font-bold hover:bg-[#00A8E8] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[rgba(0,191,255,0.3)] whitespace-nowrap"
             >
               <Edit2 size={18} />
               Modifier
@@ -137,10 +144,11 @@ export default function TerrainsPage() {
         </div>
       </div>
 
-      {/* Terrain */}
-      <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-8">
+      {/* Terrain — ratio fixe plutôt qu'une hauteur figée, sinon la moitié de
+          l'écran d'un téléphone est occupée par une zone quasi vide. */}
+      <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-8 mobile:p-3">
         <div
-          className="relative w-full h-[600px] bg-[#1a2942] rounded-2xl overflow-hidden"
+          className="relative w-full max-w-[720px] mx-auto aspect-[50/47] bg-[#1a2942] rounded-2xl overflow-hidden"
           style={{
             backgroundImage: `
               linear-gradient(rgba(0, 191, 255, 0.03) 1px, transparent 1px),
@@ -169,32 +177,50 @@ export default function TerrainsPage() {
           />
 
           {/* Spots */}
-          {spotsToDisplay.map((spot) => (
-            <div
-              key={spot.num}
-              className={`absolute ${isEditing ? 'cursor-move' : 'cursor-default'}`}
-              style={{
-                left: `${spot.x}px`,
-                top: `${spot.y}px`,
-                transform: 'translate(-50%, -50%)',
-              }}
-              draggable={isEditing}
-              onDragStart={() => handleDragStart(spot.num)}
-            >
-              <div className="relative">
-                {/* Spot circle */}
-                <div className="w-16 h-16 bg-gradient-to-br from-[rgba(0,191,255,0.25)] to-[rgba(0,191,255,0.15)] border-2 border-[#00BFFF] rounded-full flex items-center justify-center shadow-lg shadow-[rgba(0,191,255,0.2)]">
-                  <span className="text-xl font-black text-[#00BFFF]">{spot.num}</span>
-                </div>
+          {spotsToDisplay.map((spot) => {
+            const isSelected = draggedSpot === spot.num;
+            return (
+              <div
+                key={spot.num}
+                className={`absolute ${isEditing ? 'cursor-move' : 'cursor-default'}`}
+                style={{
+                  // Positionnement proportionnel : le terrain garde ses
+                  // proportions quelle que soit la largeur de l'écran.
+                  left: `${(spot.x / COURT_W) * 100}%`,
+                  top: `${(spot.y / COURT_H) * 100}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+                draggable={isEditing}
+                onDragStart={() => handleDragStart(spot.num)}
+                // Le drag HTML5 n'existe pas au doigt : en édition, un appui
+                // sélectionne le spot, l'appui suivant sur le terrain le place.
+                onClick={(e) => {
+                  if (!isEditing) return;
+                  e.stopPropagation();
+                  setDraggedSpot(isSelected ? null : spot.num);
+                }}
+              >
+                <div className="relative">
+                  {/* Spot circle */}
+                  <div
+                    className={`w-12 h-12 mobile:w-9 mobile:h-9 bg-gradient-to-br from-[rgba(0,191,255,0.25)] to-[rgba(0,191,255,0.15)] border-2 rounded-full flex items-center justify-center shadow-lg shadow-[rgba(0,191,255,0.2)] transition-all ${
+                      isSelected ? 'border-[#FFB400] scale-110 shadow-[0_0_20px_rgba(255,180,0,0.5)]' : 'border-[#00BFFF]'
+                    }`}
+                  >
+                    <span className={`text-lg mobile:text-sm font-black ${isSelected ? 'text-[#FFB400]' : 'text-[#00BFFF]'}`}>
+                      {spot.num}
+                    </span>
+                  </div>
 
-                {/* Label */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap">
-                  <div className="text-xs font-bold text-[#00BFFF] text-center">{spot.label}</div>
-                  <div className="text-[10px] text-[rgba(245,241,232,0.5)] text-center">{spot.sub}</div>
+                  {/* Label — masqué en mobile, les 10 pastilles se chevauchent */}
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap mobile:hidden">
+                    <div className="text-xs font-bold text-[#00BFFF] text-center">{spot.label}</div>
+                    <div className="text-[10px] text-[rgba(245,241,232,0.5)] text-center">{spot.sub}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

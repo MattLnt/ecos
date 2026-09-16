@@ -7,6 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { StatCard } from '@/components/dashboard/StatCard';
 import { SessionCard } from '@/components/dashboard/SessionCard';
 import { ScoreEvolutionChart } from '@/components/dashboard/ScoreEvolutionChart';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 
 interface Stats {
   totalSessions: number;
@@ -48,6 +49,10 @@ export default function HomePage() {
   const [topPlayers, setTopPlayers] = useState<TopPlayer[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Les graphiques Recharts ont besoin de valeurs numériques (hauteur, marges,
+  // taille des libellés), pas de classes CSS : on interroge donc la media query.
+  const isCompact = useMediaQuery('(max-width: 880px)');
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -83,15 +88,15 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 mobile:space-y-5">
       {/* Header avec CTA */}
-      <div className="flex items-center justify-between mobile:flex-col mobile:items-start mobile:gap-4">
+      <div className="flex items-center justify-between gap-4 mobile:flex-col mobile:items-stretch">
         <div>
-          <h1 className="text-4xl font-extrabold text-[#F5F1E8] tracking-tight mobile:text-3xl">
+          <h1 className="text-4xl font-extrabold text-[#F5F1E8] tracking-tight mobile:text-2xl">
             Tableau de bord
           </h1>
-          <p className="text-[rgba(245,241,232,0.55)] mt-2">
-            Vue d'ensemble de vos performances
+          <p className="text-[rgba(245,241,232,0.55)] mt-2 mobile:mt-1 mobile:text-sm">
+            Vue d&apos;ensemble de vos performances
           </p>
         </div>
         
@@ -105,7 +110,7 @@ export default function HomePage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-5 mobile:grid-cols-2">
+      <div className="grid grid-cols-4 gap-5 mobile:grid-cols-2 mobile:gap-3">
         <StatCard
           icon={Target}
           value={stats.totalSessions}
@@ -137,22 +142,25 @@ export default function HomePage() {
         <ScoreEvolutionChart />
 
         {/* Bar Chart - Top Players */}
-        <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-6 backdrop-blur-sm">
-          <div className="mb-6">
+        <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-6 mobile:p-4 backdrop-blur-sm">
+          <div className="mb-6 mobile:mb-4">
             <h2 className="text-lg font-bold text-[#F5F1E8]">Top 5 Joueurs</h2>
             <p className="text-sm text-[rgba(245,241,232,0.55)] mt-1">Par moyenne de points</p>
           </div>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={topPlayers}>
+          <ResponsiveContainer width="100%" height={isCompact ? 220 : 280}>
+            <BarChart data={topPlayers} margin={{ top: 4, right: 4, left: isCompact ? -18 : 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,191,255,0.1)" />
-              <XAxis 
-                dataKey="name" 
-                stroke="rgba(245,241,232,0.35)" 
-                style={{ fontSize: '12px' }}
+              <XAxis
+                dataKey="name"
+                stroke="rgba(245,241,232,0.35)"
+                interval={0}
+                tickMargin={6}
+                style={{ fontSize: isCompact ? '9px' : '12px' }}
               />
-              <YAxis 
-                stroke="rgba(245,241,232,0.35)" 
-                style={{ fontSize: '12px' }}
+              <YAxis
+                stroke="rgba(245,241,232,0.35)"
+                width={isCompact ? 32 : 40}
+                style={{ fontSize: isCompact ? '10px' : '12px' }}
               />
               <Tooltip 
                 contentStyle={{ 
@@ -185,22 +193,22 @@ export default function HomePage() {
       </div>
 
       {/* Dernières Sessions */}
-      <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-6 backdrop-blur-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-bold text-[#F5F1E8]">Dernières Sessions</h2>
-            <p className="text-sm text-[rgba(245,241,232,0.55)] mt-1">3 plus récentes</p>
+      <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-6 mobile:p-4 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-3 mb-6 mobile:mb-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-[#F5F1E8] truncate">Dernières Sessions</h2>
+            <p className="text-sm text-[rgba(245,241,232,0.55)] mt-1 mobile:text-xs">3 plus récentes</p>
           </div>
           <button
             onClick={() => router.push('/sessions')}
-            className="flex items-center gap-2 px-4 py-2 bg-[rgba(0,191,255,0.08)] hover:bg-[rgba(0,191,255,0.15)] border border-[rgba(0,191,255,0.2)] rounded-lg text-[#00BFFF] font-semibold text-sm transition-all"
+            className="shrink-0 flex items-center gap-2 mobile:gap-1 px-4 mobile:px-3 py-2 bg-[rgba(0,191,255,0.08)] hover:bg-[rgba(0,191,255,0.15)] border border-[rgba(0,191,255,0.2)] rounded-lg text-[#00BFFF] font-semibold text-sm mobile:text-xs whitespace-nowrap active:scale-95 transition-all"
           >
             <span>Voir tout</span>
-            <ChevronRight size={16} />
+            <ChevronRight size={16} className="shrink-0" />
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 mobile:space-y-2">
           {recentSessions.length === 0 ? (
             <div className="text-center py-8 text-[rgba(245,241,232,0.35)]">
               Aucune session terminée
