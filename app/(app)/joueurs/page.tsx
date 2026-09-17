@@ -138,7 +138,9 @@ export default function JoueursPage() {
   const playersToDelete = players.filter(p => selectedForDelete.includes(p.id));
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-3 sm:px-0">
+    // Pas de px- ici : le layout (app) fournit déjà la gouttière de page, et
+    // la doubler coûtait 24px de large sur les petits écrans.
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
@@ -278,7 +280,12 @@ export default function JoueursPage() {
         </div>
       ) : viewMode === 'cards' ? (
         // Vue cartes premium
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
+        // Colonnes dérivées de la largeur réelle de la carte : elles ne peuvent
+        // plus être plus étroites qu'elle, donc plus de chevauchement.
+        <div
+          className="grid gap-3 sm:gap-5 lg:gap-7 justify-items-center"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(var(--card-w), 1fr))' }}
+        >
           {players.map((player) => {
             const isSelected = selectedForDelete.includes(player.id);
             const isClickable = actionMode !== 'none';

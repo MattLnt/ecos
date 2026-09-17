@@ -100,7 +100,8 @@ export function PlayerCard({
   const teamColor = nbaTeam ? NBA_TEAM_COLORS[nbaTeam] || '#00BFFF' : '#00BFFF';
 
   return (
-    <div className={styles.card}>
+    <div className={styles.cardWrap}>
+      <div className={styles.card}>
       {/* Frame gold avec décorations */}
       <div className={styles.cardFrame}>
         {/* Shards décoratifs en haut à droite */}
@@ -150,9 +151,9 @@ export function PlayerCard({
               className={styles.portrait}
             />
           ) : (
-            <div 
+            <div
               className={styles.portraitFallback}
-              style={{ backgroundColor: avatar }}
+              style={{ '--avatar': avatar } as React.CSSProperties}
             >
               {initials}
             </div>
@@ -200,6 +201,7 @@ export function PlayerCard({
 
         {/* Sheen effect (lueur qui passe) */}
         <div className={styles.sheen}></div>
+      </div>
       </div>
     </div>
   );

@@ -18,7 +18,29 @@
 
     /* Largeur courante de la sidebar desktop — pilotée par <Sidebar /> */
     --sidebar-w: 260px;
+
+    /*
+      Cartes joueurs : la carte est dessinée à sa taille native (320x468) puis
+      mise à l'échelle. --card-w / --card-h donnent la place réellement
+      occupée, ce qui permet à la grille de réserver la bonne taille au lieu
+      de compenser au jugé avec des marges négatives.
+    */
+    --card-scale: 1;
+    --card-w: calc(320px * var(--card-scale));
+    --card-h: calc(468px * var(--card-scale));
   }
+
+  /*
+    Échelle des cartes par media query (pas de container query ici).
+    Calibré pour que la grille auto-fill tombe sur 2 colonnes dès 360px,
+    3 sur tablette, 4 sur grand écran — sans jamais serrer les cartes.
+    Le palier 641-1279 est identique des deux côtés de 880px : au-delà la
+    sidebar reprend 260px, donc la place utile ne change quasiment pas.
+  */
+  @media (max-width: 400px)                          { :root { --card-scale: 0.46; } }
+  @media (min-width: 401px) and (max-width: 640px)   { :root { --card-scale: 0.56; } }
+  @media (min-width: 641px) and (max-width: 1279px)  { :root { --card-scale: 0.64; } }
+  @media (min-width: 1280px) and (max-width: 1599px) { :root { --card-scale: 0.78; } }
 
   * {
     box-sizing: border-box;

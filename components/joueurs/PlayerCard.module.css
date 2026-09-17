@@ -1,57 +1,28 @@
 /* ============ CARTE PRINCIPALE ============ */
+/*
+  Le conteneur occupe la taille RÉELLE (après mise à l'échelle) : c'est lui qui
+  dimensionne la cellule de grille. Sans ça, la carte gardait sa boîte de 320px
+  dans une colonne plus étroite, débordait sur sa voisine, et la carte suivante
+  — peinte au-dessus — interceptait les clics : on éditait le mauvais joueur.
+*/
+.cardWrap {
+  width: var(--card-w);
+  height: var(--card-h);
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.cardWrap:hover {
+  transform: translateY(-6px);
+}
+
 .card {
   width: 320px;
   height: 468px;
   position: relative;
   perspective: 1000px;
-  cursor: pointer;
-  transition: transform 0.3s ease;
-  /* Sur écran < 400px, on scale */
-  transform-origin: center top;
-}
-
-/* Responsive : scale automatique selon viewport */
-@media (max-width: 400px) {
-  .card {
-    transform: scale(0.5);
-    margin: 0 -80px -234px -80px; /* Compense le scale pour éviter espaces vides */
-  }
-}
-
-@media (min-width: 401px) and (max-width: 640px) {
-  .card {
-    transform: scale(0.55);
-    margin: 0 -72px -210px -72px;
-  }
-}
-
-@media (min-width: 641px) and (max-width: 768px) {
-  .card {
-    transform: scale(0.7);
-    margin: 0 -48px -140px -48px;
-  }
-}
-
-.card:hover {
-  transform: translateY(-4px);
-}
-
-@media (max-width: 400px) {
-  .card:hover {
-    transform: scale(0.5) translateY(-4px);
-  }
-}
-
-@media (min-width: 401px) and (max-width: 640px) {
-  .card:hover {
-    transform: scale(0.55) translateY(-4px);
-  }
-}
-
-@media (min-width: 641px) and (max-width: 768px) {
-  .card:hover {
-    transform: scale(0.7) translateY(-4px);
-  }
+  transform: scale(var(--card-scale));
+  transform-origin: top left;
 }
 
 .cardFrame {
@@ -271,18 +242,39 @@
   -webkit-mask-image: linear-gradient(to bottom, black 0%, black 65%, transparent 100%);
 }
 
+/*
+  Sans photo, un carré plein de 200x200 écrasait la carte et jurait avec les
+  cartes photo, qui se fondent dans le fond. On reprend la même logique : un
+  halo de la couleur du joueur, fondu en bas comme le portrait.
+*/
 .portraitFallback {
-  width: 200px;
-  height: 200px;
-  border-radius: 12px;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Oswald', sans-serif;
   font-weight: 600;
-  font-size: 88px;
+  font-size: 104px;
+  line-height: 1;
+  letter-spacing: -0.02em;
   color: #0a1628;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  background:
+    radial-gradient(circle at 50% 42%,
+      var(--avatar) 0%,
+      var(--avatar) 34%,
+      color-mix(in srgb, var(--avatar) 55%, transparent) 52%,
+      transparent 70%);
+  mask-image: linear-gradient(to bottom, black 0%, black 62%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 62%, transparent 100%);
+}
+
+/* Repli si color-mix n'est pas supporté : dégradé simple, toujours pas carré. */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .portraitFallback {
+    background: radial-gradient(circle at 50% 42%, var(--avatar) 0%, var(--avatar) 40%, transparent 70%);
+  }
 }
 
 /* ============ VOILE DÉGRADÉ ============ */
