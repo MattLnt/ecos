@@ -71,22 +71,30 @@ export function Sidebar() {
             </button>
           </>
         ) : (
-          /*
-            Replié, le bouton portait le logo : rien n'indiquait qu'il
-            rouvrait le menu, et on restait coincé en mode réduit. Il porte
-            maintenant l'icône de dépliage — l'inverse exacte de celle qui a
-            servi à replier.
-          */
+          // Replié, le logo reste le logo : il ne commande rien.
+          <div className="w-9 h-9 bg-gradient-to-br from-[#00BFFF] to-[#0088cc] rounded-lg flex items-center justify-center shadow-[0_4px_12px_rgba(0,191,255,0.3)] mx-auto">
+            <Image src="/ecos.png" alt="ECOS" width={24} height={24} />
+          </div>
+        )}
+      </div>
+
+      {/*
+        Bouton de dépliage, sous le logo. Il a sa propre ligne plutôt que de
+        se cacher derrière le logo : replié, rien n'indiquait comment rouvrir
+        le menu et on restait coincé en mode réduit.
+      */}
+      {collapsed && (
+        <div className="shrink-0 flex justify-center py-2 border-b border-[rgba(0,191,255,0.1)]">
           <button
             onClick={toggleSidebar}
             title="Déplier le menu"
-            className="w-9 h-9 bg-gradient-to-br from-[#00BFFF] to-[#0088cc] rounded-lg flex items-center justify-center shadow-[0_4px_12px_rgba(0,191,255,0.3)] mx-auto hover:scale-105 active:scale-95 transition-transform"
+            className="w-10 h-10 rounded-lg flex items-center justify-center border border-[rgba(0,191,255,0.25)] bg-[rgba(0,191,255,0.08)] text-[#00BFFF] hover:bg-[rgba(0,191,255,0.18)] hover:border-[#00BFFF] active:scale-90 transition-all"
             aria-label="Déplier le menu"
           >
-            <PanelLeftOpen size={20} className="text-[#0A1628]" />
+            <PanelLeftOpen size={20} />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Menu label */}
       {!collapsed && (
