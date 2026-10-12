@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { Home, Users, BarChart3, Calendar, Menu } from 'lucide-react';
+import { Home, Users, BarChart3, Calendar, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 const navItems = [
   { href: '/home', label: 'Accueil', icon: Home },
@@ -63,19 +63,27 @@ export function Sidebar() {
 
             <button
               onClick={toggleSidebar}
+              title="Replier le menu"
               className="w-8 h-8 hover:bg-[rgba(0,191,255,0.1)] rounded-lg flex items-center justify-center transition-colors"
               aria-label="Replier le menu"
             >
-              <Menu size={18} className="text-[rgba(245,241,232,0.7)]" />
+              <PanelLeftClose size={18} className="text-[rgba(245,241,232,0.7)]" />
             </button>
           </>
         ) : (
+          /*
+            Replié, le bouton portait le logo : rien n'indiquait qu'il
+            rouvrait le menu, et on restait coincé en mode réduit. Il porte
+            maintenant l'icône de dépliage — l'inverse exacte de celle qui a
+            servi à replier.
+          */
           <button
             onClick={toggleSidebar}
-            className="w-9 h-9 bg-gradient-to-br from-[#00BFFF] to-[#0088cc] rounded-lg flex items-center justify-center shadow-[0_4px_12px_rgba(0,191,255,0.3)] mx-auto hover:scale-105 transition-transform"
+            title="Déplier le menu"
+            className="w-9 h-9 bg-gradient-to-br from-[#00BFFF] to-[#0088cc] rounded-lg flex items-center justify-center shadow-[0_4px_12px_rgba(0,191,255,0.3)] mx-auto hover:scale-105 active:scale-95 transition-transform"
             aria-label="Déplier le menu"
           >
-            <Image src="/ecos.png" alt="ECOS" width={24} height={24} />
+            <PanelLeftOpen size={20} className="text-[#0A1628]" />
           </button>
         )}
       </div>
