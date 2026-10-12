@@ -133,6 +133,7 @@ export async function GET(
       lastName: player.lastName,
       photo: player.photo,
       avatar: player.avatar,
+      position: player.position,
       nbaTeam: player.nbaTeam,
       totalSessions,
       totalPoints,

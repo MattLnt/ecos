@@ -28,6 +28,8 @@
     --card-scale: 1;
     --card-w: calc(320px * var(--card-scale));
     --card-h: calc(468px * var(--card-scale));
+    /* Échelle lue par <FutPlayerCard />. La page profil la surcharge. */
+    --fut-scale: var(--card-scale);
   }
 
   /*

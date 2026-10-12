@@ -1,0 +1,12 @@
+/*
+  Déclinaison XL de la carte joueur pour la page profil : même dessin que dans
+  la grille /joueurs, seule l'échelle change. Les paliers sont calés pour que
+  la carte tienne toujours dans la colonne de contenu, sidebar comprise.
+*/
+.xl {
+  --fut-scale: 1.3;
+}
+
+@media (max-width: 880px) { .xl { --fut-scale: 1.1; } }
+@media (max-width: 480px) { .xl { --fut-scale: 0.95; } }
+@media (max-width: 380px) { .xl { --fut-scale: 0.82; } }

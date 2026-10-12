@@ -16,6 +16,7 @@ interface PlayerProfile {
   lastName: string;
   photo: string | null;
   avatar: string;
+  position: string | null;
   nbaTeam: string | null;
   totalSessions: number;
   totalPoints: number;
@@ -97,6 +98,7 @@ export default function PlayerProfilePage() {
         lastName={player.lastName}
         photo={player.photo}
         avatar={player.avatar}
+        position={player.position}
         nbaTeam={player.nbaTeam}
         totalSessions={player.totalSessions}
         victories={player.victories}

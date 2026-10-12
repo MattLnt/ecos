@@ -9,6 +9,7 @@ interface ProfileHeaderProps {
   lastName: string;
   photo: string | null;
   avatar: string;
+  position?: string | null;
   nbaTeam: string | null;
   totalSessions: number;
   victories: number;
@@ -24,6 +25,7 @@ export function ProfileHeader({
   lastName, 
   photo, 
   avatar,
+  position,
   nbaTeam,
   totalSessions, 
   victories, 
@@ -53,11 +55,13 @@ export function ProfileHeader({
         </div>
       </div>
 
-      {/* Carte FIFA style */}
+      {/* Carte joueur */}
       <PlayerCard
         firstName={firstName}
         lastName={lastName}
         photo={photo}
+        avatar={avatar}
+        position={position}
         nbaTeam={nbaTeam}
         avgPoints={avgPoints}
         midRate={midRate}
