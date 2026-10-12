@@ -51,13 +51,13 @@ export default function StatsPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 mobile:space-y-5">
       {/* Header */}
       <div>
         <h1 className="text-4xl font-extrabold text-[#F5F1E8] tracking-tight mobile:text-3xl">
           Statistiques
         </h1>
-        <p className="text-[rgba(245,241,232,0.55)] mt-2">
+        <p className="text-[rgba(245,241,232,0.55)] mt-2 mobile:mt-1 mobile:text-sm">
           Analyse complète de vos performances
         </p>
       </div>
@@ -90,7 +90,7 @@ export default function StatsPage() {
 
       {/* ===== MODE GLOBAL ===== */}
       {viewMode === 'global' && (
-        <div className="space-y-8">
+        <div className="space-y-8 mobile:space-y-6">
           <OverviewStats />
           <SpotPerformance />
           <PlayerRanking />
