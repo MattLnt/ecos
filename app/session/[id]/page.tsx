@@ -133,15 +133,39 @@ export default function SessionPage() {
     }
   };
 
-  // Pas de pull-to-refresh pendant une session : un geste vers le bas
-  // rechargerait la page et ferait perdre la saisie en cours. Restreint à
-  // cette page — ailleurs on garde le défilement natif de Chrome.
+  /*
+    Deux réglages du document, le temps de la session seulement.
+
+    1. Pas de pull-to-refresh : un geste vers le bas rechargerait la page et
+       ferait perdre la saisie en cours.
+
+    2. `body` porte un `min-height: 100vh` global, utile aux pages qui
+       défilent. Ici l'écran fait `100dvh` : sur mobile, `vh` ignore la barre
+       d'URL alors que `dvh` en tient compte, donc le body dépassait le
+       contenu de la hauteur exacte de cette barre — une bande vide en bas,
+       et la page se mettait à défiler. On relâche la contrainte, le body
+       suit alors l'écran.
+
+    Les deux sont restaurés au démontage : les autres pages en ont besoin.
+  */
   useEffect(() => {
-    const el = document.documentElement;
-    const previous = el.style.overscrollBehavior;
-    el.style.overscrollBehavior = 'none';
+    const html = document.documentElement;
+    const body = document.body;
+
+    const previous = {
+      overscroll: html.style.overscrollBehavior,
+      minHeight: body.style.minHeight,
+      overflow: body.style.overflow,
+    };
+
+    html.style.overscrollBehavior = 'none';
+    body.style.minHeight = '0';
+    body.style.overflow = 'hidden';
+
     return () => {
-      el.style.overscrollBehavior = previous;
+      html.style.overscrollBehavior = previous.overscroll;
+      body.style.minHeight = previous.minHeight;
+      body.style.overflow = previous.overflow;
     };
   }, []);
 
