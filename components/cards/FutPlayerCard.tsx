@@ -12,17 +12,15 @@ export interface FutStat {
 interface FutPlayerCardProps {
   firstName: string;
   lastName: string;
-  /** Note globale affichée en haut à gauche, à la place du classique « OVR ». */
+  /** Note globale, à la place du classique « OVR ». */
   overall: number;
   position?: string | null;
   photo?: string | null;
   /** Couleur du joueur, utilisée pour le halo quand il n'a pas de photo. */
   avatar: string;
   nbaTeam?: string | null;
-  /** Exactement six stats : deux colonnes de trois. */
+  /** Exactement six stats : trois colonnes, deux lignes. */
   stats: FutStat[];
-  /** Libellé discret dans la pointe basse de la carte. */
-  footer?: string;
   className?: string;
 }
 
@@ -35,7 +33,6 @@ export function FutPlayerCard({
   avatar,
   nbaTeam,
   stats,
-  footer = 'ECOS Shoots',
   className,
 }: FutPlayerCardProps) {
   const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
@@ -57,11 +54,7 @@ export function FutPlayerCard({
 
           <div className={styles.portraitWrap}>
             {photo ? (
-              <img
-                src={photo}
-                alt={`${firstName} ${lastName}`}
-                className={styles.portrait}
-              />
+              <img src={photo} alt={`${firstName} ${lastName}`} className={styles.portrait} />
             ) : (
               <div
                 className={styles.portraitFallback}
@@ -74,7 +67,6 @@ export function FutPlayerCard({
 
           <div className={styles.veil} />
 
-          {/* Note, poste et logo d'équipe, empilés dans la colonne de gauche */}
           <div className={styles.identity}>
             <div className={styles.overall}>{overall}</div>
             <div className={styles.position}>{position || 'SF'}</div>
@@ -99,8 +91,6 @@ export function FutPlayerCard({
               </div>
             ))}
           </div>
-
-          <div className={styles.footer}>{footer}</div>
 
           <div className={styles.sheen} />
         </div>

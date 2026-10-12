@@ -1,6 +1,6 @@
 /*
   ============================================================
-  CARTE JOUEUR — silhouette type carte à collectionner
+  CARTE JOUEUR
   ============================================================
   La carte est TOUJOURS dessinée à sa taille native (320x468) puis mise à
   l'échelle par `transform: scale()`. Toutes les positions internes sont donc
@@ -10,13 +10,20 @@
   Le wrapper, lui, occupe la taille APRÈS mise à l'échelle : c'est lui qui
   dimensionne la cellule de grille. Sans ça la carte garderait sa boîte de
   320px dans une colonne plus étroite et déborderait sur sa voisine.
+
+  Organisation : colonne d'identité à gauche (note, poste, logo), portrait à
+  droite, nom sur une ligne dorée, puis les six stats en trois colonnes.
 */
 
 .wrap {
   --scale: var(--fut-scale, 1);
-  /* Contour extérieur (cadre doré) et contour rentré de 4px (corps). */
-  --outline: path('M 30 3 L 290 3 C 306 3 317 14 317 30 L 317 322 C 317 344 309 359 291 372 L 173 458 C 165 464 155 464 147 458 L 29 372 C 11 359 3 344 3 322 L 3 30 C 3 14 14 3 30 3 Z');
-  --outline-inner: path('M 34 7 L 286 7 C 300 7 313 18 313 32 L 313 321 C 313 341 305 354 288 366 L 171 451 C 164 456 156 456 149 451 L 32 366 C 15 354 7 341 7 321 L 7 32 C 7 18 20 7 34 7 Z');
+  /*
+    Contour extérieur (cadre doré) et contour rentré de 4px (corps). Le second
+    est écrit à la main : sur les courbes, décaler les points de 4px ne donne
+    pas un contour parallèle.
+  */
+  --outline: path('M 30 3 L 290 3 C 306 3 317 14 317 30 L 317 360 C 317 418 262 455 160 455 C 58 455 3 418 3 360 L 3 30 C 3 14 14 3 30 3 Z');
+  --outline-inner: path('M 34 7 L 286 7 C 300 7 313 18 313 32 L 313 359 C 313 413 260 450 160 450 C 60 450 7 413 7 359 L 7 32 C 7 18 20 7 34 7 Z');
   width: calc(320px * var(--scale));
   height: calc(468px * var(--scale));
   flex: none;
@@ -31,8 +38,7 @@
 
 /*
   Le clip vit sur .card, pas seulement sur le fond : le voile, le nom et les
-  stats sont ses enfants directs et dépasseraient sinon de la pointe, ce qui
-  redonnait à la carte un bas rectangulaire.
+  stats sont ses enfants et dépasseraient sinon de la silhouette.
 */
 .card {
   width: 320px;
@@ -45,15 +51,15 @@
 
 /*
   Le cadre doré suit la silhouette : un calque doré découpé au contour
-  extérieur, puis le corps de la carte découpé à un contour rentré de 4px.
-  Une bordure CSS, elle, resterait rectangulaire sous le clip-path.
+  extérieur, le corps découpé au contour rentré. Une bordure CSS, elle,
+  resterait rectangulaire sous le clip-path.
 */
 .frame {
   position: absolute;
   inset: 0;
   clip-path: var(--outline);
   /* Dégradé conique plutôt que linéaire : un linéaire laisse toujours deux
-     arêtes dans sa teinte la plus sombre, et la pointe basse — l'arête la
+     arêtes dans sa teinte la plus sombre, et le bas de la carte — l'arête la
      plus fine — disparaissait alors sur le fond. */
   background: conic-gradient(
     from 200deg at 50% 45%,
@@ -110,16 +116,16 @@
 .identity {
   position: absolute;
   top: 26px;
-  left: 26px;
-  width: 78px;
+  left: 24px;
+  width: 76px;
   z-index: 5;
   text-align: center;
-  font-family: var(--font-oswald), sans-serif;
 }
 
 .overall {
+  font-family: var(--font-oswald), sans-serif;
   font-weight: 600;
-  font-size: 54px;
+  font-size: 50px;
   line-height: 0.88;
   letter-spacing: -1px;
   color: #ffeec0;
@@ -127,27 +133,27 @@
 }
 
 .position {
-  margin-top: 2px;
+  margin-top: 4px;
+  font-family: var(--font-oswald), sans-serif;
   font-weight: 500;
-  font-size: 19px;
+  font-size: 18px;
   letter-spacing: 3px;
   color: rgba(255, 238, 192, 0.85);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 .identityRule {
-  width: 42px;
+  width: 40px;
   height: 1px;
-  margin: 9px auto 0;
+  margin: 11px auto 0;
   background: linear-gradient(to right, transparent, #e7c56b, transparent);
 }
 
-/* ============ LOGO ÉQUIPE ============ */
 .teamLogoWrap {
   position: relative;
-  width: 54px;
-  height: 54px;
-  margin: 12px auto 0;
+  width: 46px;
+  height: 46px;
+  margin: 16px auto 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -164,8 +170,8 @@
 
 .teamLogo {
   position: relative;
-  width: 46px;
-  height: 46px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.35));
 }
@@ -178,10 +184,10 @@
 /* ============ PORTRAIT ============ */
 .portraitHalo {
   position: absolute;
-  top: 26px;
-  left: 106px;
-  width: 210px;
-  height: 230px;
+  top: 28px;
+  left: 108px;
+  width: 204px;
+  height: 220px;
   background: radial-gradient(circle at 50% 45%, rgba(0, 168, 232, 0.4) 0%, transparent 66%);
   filter: blur(22px);
   z-index: 1;
@@ -190,10 +196,10 @@
 
 .portraitWrap {
   position: absolute;
-  top: 32px;
-  left: 110px;
-  width: 196px;
-  height: 238px;
+  top: 34px;
+  left: 112px;
+  width: 194px;
+  height: 224px;
   z-index: 3;
 }
 
@@ -219,7 +225,7 @@
   justify-content: center;
   font-family: var(--font-oswald), sans-serif;
   font-weight: 600;
-  font-size: 96px;
+  font-size: 88px;
   line-height: 1;
   letter-spacing: -0.03em;
   color: #0a1628;
@@ -248,7 +254,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 250px;
+  height: 260px;
   background: linear-gradient(
     to bottom,
     transparent 0%,
@@ -263,14 +269,14 @@
 /* ============ NOM ============ */
 .name {
   position: absolute;
-  bottom: 214px;
+  bottom: 190px;
   left: 18px;
   right: 18px;
   z-index: 5;
   text-align: center;
   font-family: var(--font-oswald), sans-serif;
   font-weight: 600;
-  font-size: 34px;
+  font-size: 32px;
   line-height: 1;
   letter-spacing: 2px;
   color: #ffeec0;
@@ -282,22 +288,21 @@
 
 .divider {
   position: absolute;
-  bottom: 198px;
-  left: 44px;
-  right: 44px;
+  bottom: 176px;
+  left: 42px;
+  right: 42px;
   height: 1px;
   z-index: 5;
   background: linear-gradient(to right, transparent, #c99b3c 18%, #ffeec0 50%, #c99b3c 82%, transparent);
   box-shadow: 0 0 10px rgba(217, 177, 74, 0.45);
 }
 
-/* Losange central sur la ligne dorée — rappel du bas en pointe de la carte. */
 .dividerGem {
   position: absolute;
-  bottom: 193px;
+  bottom: 172px;
   left: 50%;
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   z-index: 6;
   transform: translateX(-50%) rotate(45deg);
   background: linear-gradient(135deg, #ffeec0, #c99b3c);
@@ -305,58 +310,41 @@
 }
 
 /* ============ STATS ============
-   Six stats en deux colonnes de trois. La grille s'arrête au-dessus de y=372,
-   là où les flancs commencent à converger vers la pointe : plus bas, la
-   silhouette rognerait la dernière ligne. */
+   Trois colonnes, chiffre au-dessus du libellé. La grille s'arrête à y=410 :
+   plus bas, la courbe de la base rogne les colonnes extérieures. */
 .stats {
   position: absolute;
-  bottom: 104px;
-  left: 40px;
-  right: 40px;
+  bottom: 58px;
+  left: 28px;
+  right: 28px;
   z-index: 5;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px 18px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px 6px;
 }
 
 .stat {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
+  text-align: center;
   font-family: var(--font-barlow-condensed), var(--font-barlow), sans-serif;
 }
 
 .statValue {
-  min-width: 30px;
+  display: block;
   font-weight: 700;
-  font-size: 23px;
+  font-size: 25px;
   line-height: 1;
   color: #ffeec0;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 .statLabel {
+  display: block;
+  margin-top: 5px;
   font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 1.4px;
+  font-size: 11px;
+  letter-spacing: 1.6px;
   text-transform: uppercase;
   color: rgba(255, 238, 192, 0.55);
-}
-
-/* ============ PIED (dans la pointe) ============ */
-.footer {
-  position: absolute;
-  bottom: 56px;
-  left: 0;
-  right: 0;
-  z-index: 5;
-  text-align: center;
-  font-family: var(--font-barlow-condensed), var(--font-barlow), sans-serif;
-  font-weight: 700;
-  font-size: 10px;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  color: rgba(255, 238, 192, 0.4);
 }
 
 /* ============ REFLET ============ */
