@@ -69,4 +69,9 @@ model SpotResult {
   ftMakes         Int           // 0-2
   points          Int           // makes * ftMakes
   createdAt       DateTime      @default(now())
+
+  // Un spot n'est tiré qu'une fois par joueur et par session. Sans cette
+  // contrainte, un double appui ou un retour arrière créait une seconde ligne
+  // et les stats cumulaient les deux (« 10/20 tirs »).
+  @@unique([sessionPlayerId, spotNum])
 }

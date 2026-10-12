@@ -49,7 +49,12 @@ interface HistoryEntry {
   playerIndex: number;
   mode: 'shooting' | 'validating';
   currentMakes: number | null;
-  savedScore?: { sessionPlayerId: string; spotId: string; previous: SpotScore } | null;
+  savedScore?: {
+    sessionPlayerId: string;
+    spotId: string;
+    spotNum: number;
+    previous: SpotScore;
+  } | null;
 }
 
 /**
@@ -82,6 +87,12 @@ export default function SessionPage() {
   const [showRanking, setShowRanking] = useState(false);
 
   const allowLeaveRef = useRef(false);
+  /*
+    Verrou de saisie. `mode` ne repasse à 'shooting' qu'après le rendu suivant :
+    deux appuis rapprochés sur le pavé des lancers francs passaient tous deux
+    la garde et enregistraient le spot deux fois. Une ref change tout de suite.
+  */
+  const submittingRef = useRef(false);
 
   // Sur petit écran le terrain est réduit : on grossit les pastilles de spot
   const isMobile = useMediaQuery('(max-width: 880px)');
@@ -162,30 +173,59 @@ export default function SessionPage() {
   }, [session]);
 
   const handleUndo = useCallback(() => {
-    setHistory((prev) => {
-      if (prev.length === 0) return prev;
+    const last = history[history.length - 1];
+    if (!last) return;
 
-      const last = prev[prev.length - 1];
+    setCurrentSpotIndex(last.spotIndex);
+    setCurrentPlayerIndex(last.playerIndex);
+    setMode(last.mode);
+    setCurrentMakes(last.currentMakes);
 
-      setCurrentSpotIndex(last.spotIndex);
-      setCurrentPlayerIndex(last.playerIndex);
-      setMode(last.mode);
-      setCurrentMakes(last.currentMakes);
+    if (last.savedScore) {
+      const { sessionPlayerId, spotId, spotNum, previous } = last.savedScore;
 
-      if (last.savedScore) {
-        const { sessionPlayerId, spotId, previous } = last.savedScore;
-        setScores((s) => ({
-          ...s,
-          [sessionPlayerId]: {
-            ...s[sessionPlayerId],
-            [spotId]: previous,
-          },
-        }));
-      }
+      setScores((s) => ({
+        ...s,
+        [sessionPlayerId]: {
+          ...s[sessionPlayerId],
+          [spotId]: previous,
+        },
+      }));
 
-      return prev.slice(0, -1);
-    });
-  }, []);
+      /*
+        Le serveur garde aussi une trace du spot : sans ça, la ligne survivait
+        au retour arrière et la ressaisie en créait une seconde. On supprime,
+        ou on réécrit la valeur d'avant si le spot avait déjà été rempli.
+      */
+      const url = `/api/sessions/${sessionId}/spot-result`;
+      const undoRequest =
+        previous.makes === null
+          ? fetch(url, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionPlayerId, spotNum }),
+            })
+          : fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionPlayerId,
+                spotNum,
+                spotLabel: session?.court.spotsConfig[last.spotIndex]?.label ?? '',
+                spotSub: session?.court.spotsConfig[last.spotIndex]?.sub ?? '',
+                makes: previous.makes,
+                ftMakes: previous.ftMakes,
+                points: previous.points,
+              }),
+            });
+
+      undoRequest.catch((error) => {
+        console.error('Erreur annulation spot result:', error);
+      });
+    }
+
+    setHistory((prev) => prev.slice(0, -1));
+  }, [history, sessionId, session]);
 
   const handleQuitConfirm = () => {
     allowLeaveRef.current = true;
@@ -207,8 +247,11 @@ export default function SessionPage() {
     setMode('validating');
   }, [session, mode, currentSpotIndex, currentPlayerIndex]);
 
-  const handleFt = useCallback(async (ftMakes: number) => {
+  const handleFt = useCallback((ftMakes: number) => {
     if (!session || mode !== 'validating' || currentMakes === null) return;
+    // Deuxième appui pendant que le premier part : on l'ignore.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     const currentSessionPlayer = session.sessionPlayers[currentPlayerIndex];
     const currentSpot = session.court.spotsConfig[currentSpotIndex];
@@ -225,27 +268,10 @@ export default function SessionPage() {
       savedScore: {
         sessionPlayerId: currentSessionPlayer.id,
         spotId: currentSpot.id,
+        spotNum: currentSpot.num,
         previous: previousScore,
       },
     }]);
-
-    try {
-      await fetch(`/api/sessions/${sessionId}/spot-result`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionPlayerId: currentSessionPlayer.id,
-          spotNum: currentSpot.num,
-          spotLabel: currentSpot.label,
-          spotSub: currentSpot.sub,
-          makes: currentMakes,
-          ftMakes,
-          points,
-        }),
-      });
-    } catch (error) {
-      console.error('Erreur sauvegarde spot result:', error);
-    }
 
     setScores((prev) => ({
       ...prev,
@@ -254,6 +280,31 @@ export default function SessionPage() {
         [currentSpot.id]: { makes: currentMakes, ftMakes, points },
       },
     }));
+
+    /*
+      On avance avant d'attendre le réseau : la saisie suivante ne doit pas
+      dépendre de la latence, et l'écran reste réactif sur un terrain mal
+      couvert. L'enregistrement est idempotent côté serveur.
+    */
+    fetch(`/api/sessions/${sessionId}/spot-result`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionPlayerId: currentSessionPlayer.id,
+        spotNum: currentSpot.num,
+        spotLabel: currentSpot.label,
+        spotSub: currentSpot.sub,
+        makes: currentMakes,
+        ftMakes,
+        points,
+      }),
+    })
+      .catch((error) => {
+        console.error('Erreur sauvegarde spot result:', error);
+      })
+      .finally(() => {
+        submittingRef.current = false;
+      });
 
     const nextPlayerIndex = currentPlayerIndex + 1;
 
