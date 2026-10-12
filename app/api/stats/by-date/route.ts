@@ -69,6 +69,22 @@ export async function GET(request: Request) {
       ftMakes: number;
       bestScore: number;
       worstScore: number;
+      spots: Record<number, PlayerSpotAgg>;
+    }
+
+    /*
+      Détail par spot d'un joueur. Sur « toutes les sessions du jour » un même
+      spot est tiré plusieurs fois : on cumule, et `attempts` sert à calculer
+      le dénominateur (10 tirs et 2 lancers francs par passage).
+    */
+    interface PlayerSpotAgg {
+      spotNum: number;
+      spotLabel: string;
+      spotSub: string;
+      attempts: number;
+      makes: number;
+      ftMakes: number;
+      points: number;
     }
 
     const playerMap: Record<string, PlayerAgg> = {};
@@ -104,6 +120,7 @@ export async function GET(request: Request) {
             ftMakes: 0,
             bestScore: 0,
             worstScore: Number.MAX_SAFE_INTEGER,
+            spots: {},
           };
         }
 
@@ -124,6 +141,23 @@ export async function GET(request: Request) {
           }
           p.ftTotal += 2;
           p.ftMakes += sr.ftMakes;
+
+          if (!p.spots[sr.spotNum]) {
+            p.spots[sr.spotNum] = {
+              spotNum: sr.spotNum,
+              spotLabel: sr.spotLabel,
+              spotSub: sr.spotSub,
+              attempts: 0,
+              makes: 0,
+              ftMakes: 0,
+              points: 0,
+            };
+          }
+          const ps = p.spots[sr.spotNum];
+          ps.attempts += 1;
+          ps.makes += sr.makes;
+          ps.ftMakes += sr.ftMakes;
+          ps.points += sr.points;
 
           // Stats spot
           if (!spotMap[sr.spotNum]) {
@@ -155,6 +189,19 @@ export async function GET(request: Request) {
         midRate: p.midTotal > 0 ? Math.round((p.midMakes / p.midTotal) * 1000) / 10 : 0,
         threePointRate: p.threeTotal > 0 ? Math.round((p.threeMakes / p.threeTotal) * 1000) / 10 : 0,
         ftRate: p.ftTotal > 0 ? Math.round((p.ftMakes / p.ftTotal) * 1000) / 10 : 0,
+        spots: Object.values(p.spots)
+          .map((ps) => ({
+            spotNum: ps.spotNum,
+            spotLabel: ps.spotLabel,
+            spotSub: ps.spotSub,
+            attempts: ps.attempts,
+            makes: ps.makes,
+            shotsTotal: ps.attempts * 10,
+            ftMakes: ps.ftMakes,
+            ftTotal: ps.attempts * 2,
+            points: ps.points,
+          }))
+          .sort((a, b) => a.spotNum - b.spotNum),
       }))
       .sort((a, b) => b.totalPoints - a.totalPoints);
 
