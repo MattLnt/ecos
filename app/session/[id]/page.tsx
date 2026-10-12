@@ -283,9 +283,25 @@ export default function SessionPage() {
 
       const k = e.key;
 
+      // Pendant qu'une modale est ouverte, aucune frappe ne doit saisir un score.
+      if (showRanking || showQuitModal) {
+        if (k === 'Escape') {
+          e.preventDefault();
+          setShowRanking(false);
+          setShowQuitModal(false);
+        }
+        return;
+      }
+
       if (k === 'Backspace' || k === 'Escape') {
         e.preventDefault();
         handleUndo();
+        return;
+      }
+
+      if (k === 's' || k === 'S') {
+        e.preventDefault();
+        setShowRanking(true);
         return;
       }
 
@@ -298,7 +314,7 @@ export default function SessionPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mode, handleMakes, handleFt, handleUndo]);
+  }, [mode, handleMakes, handleFt, handleUndo, showRanking, showQuitModal]);
 
   const spotsToRender = useMemo<AnySpot[]>(() => {
     if (!session) return [];
@@ -392,6 +408,16 @@ export default function SessionPage() {
               {currentPlayer.firstName}
             </span>
           </div>
+
+          {/* Score en direct — ouvre la popup de classement */}
+          <button
+            onClick={() => setShowRanking(true)}
+            className="flex mobile:hidden shrink-0 items-center gap-2 h-10 px-4 rounded-xl bg-[rgba(0,191,255,0.1)] border border-[rgba(0,191,255,0.25)] text-[#00BFFF] text-sm font-bold hover:bg-[rgba(0,191,255,0.2)] active:scale-90 transition-all"
+            aria-label="Afficher le score en direct"
+          >
+            <Trophy size={16} className="shrink-0" />
+            <span>Score live</span>
+          </button>
 
           {/* Annuler */}
           <button
@@ -575,31 +601,44 @@ export default function SessionPage() {
         </div>
       </main>
 
-      {/* ============ CLASSEMENT MOBILE (feuille glissante) ============ */}
+      {/* ============ SCORE EN DIRECT ============
+          Modale centrée en desktop, feuille glissante en mobile. */}
       {showRanking && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden mobile:flex items-end"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 mobile:items-end mobile:p-0"
           onClick={() => setShowRanking(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Score en direct"
         >
           <div
-            className="w-full bg-[#0d1f38] border-t border-[rgba(0,191,255,0.25)] rounded-t-3xl max-h-[75dvh] flex flex-col pb-safe-b animate-in slide-in-from-bottom duration-200"
+            className="w-full max-w-md bg-[#0d1f38] border border-[rgba(0,191,255,0.25)] rounded-2xl max-h-[85dvh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200 mobile:max-w-none mobile:max-h-[75dvh] mobile:rounded-2xl mobile:rounded-b-none mobile:rounded-t-3xl mobile:border-x-0 mobile:border-b-0 mobile:pb-safe-b"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="shrink-0 flex items-center justify-between px-5 pt-4 pb-3 border-b border-[rgba(0,191,255,0.12)]">
-              <div className="flex items-center gap-2">
-                <Trophy size={18} className="text-[#00BFFF]" />
-                <h2 className="text-base font-bold text-[#F5F1E8]">Classement</h2>
+              <div className="flex items-center gap-2 min-w-0">
+                <Trophy size={18} className="text-[#00BFFF] shrink-0" />
+                <h2 className="text-base font-bold text-[#F5F1E8] truncate">Score en direct</h2>
+                <span className="shrink-0 flex items-center gap-1 ml-1 px-2 py-0.5 rounded-full bg-[rgba(0,191,255,0.12)] font-mono text-[9px] uppercase tracking-[0.18em] text-[#00BFFF]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00BFFF] animate-pulse" />
+                  Live
+                </span>
               </div>
               <button
                 onClick={() => setShowRanking(false)}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-[rgba(245,241,232,0.06)] text-[rgba(245,241,232,0.6)] active:scale-90 transition-transform"
-                aria-label="Fermer le classement"
+                className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg bg-[rgba(245,241,232,0.06)] text-[rgba(245,241,232,0.6)] hover:bg-[rgba(245,241,232,0.12)] active:scale-90 transition-all"
+                aria-label="Fermer le score"
               >
-                <ChevronDown size={20} />
+                <ChevronDown size={20} className="mobile:block hidden" />
+                <X size={18} className="block mobile:hidden" />
               </button>
             </div>
 
-            <div className="scroll-area px-4 py-3 space-y-2">
+            <div className="shrink-0 px-5 py-2 border-b border-[rgba(0,191,255,0.08)] font-mono text-[10px] uppercase tracking-[0.16em] text-[rgba(245,241,232,0.4)]">
+              Spot {currentSpotIndex + 1} / {session.court.spotsConfig.length}
+            </div>
+
+            <div className="flex-1 min-h-0 scroll-area px-4 py-3 space-y-2">
               {rankedPlayers.map((sp, idx) => {
                 const isActive = sp.id === currentSessionPlayer.id;
                 return (
