@@ -29,3 +29,34 @@ export async function GET(
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
+
+/**
+ * Supprime une session et tout ce qu'elle contient.
+ *
+ * Les `sessionPlayers` et leurs `spotResults` partent en cascade (déclarée
+ * dans le schéma), les joueurs eux-mêmes ne sont pas touchés.
+ */
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const params = await context.params;
+
+    const session = await prisma.session.findUnique({
+      where: { id: params.id },
+      select: { id: true },
+    });
+
+    if (!session) {
+      return NextResponse.json({ error: 'Session non trouvée' }, { status: 404 });
+    }
+
+    await prisma.session.delete({ where: { id: params.id } });
+
+    return NextResponse.json({ ok: true, deletedId: params.id });
+  } catch (error) {
+    console.error('Erreur DELETE session:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
+}

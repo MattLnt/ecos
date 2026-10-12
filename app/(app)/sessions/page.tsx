@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Users, Trophy, ChevronRight, Filter } from 'lucide-react';
+import { Calendar, Users, ChevronRight, Filter, Trash2, X } from 'lucide-react';
 
 interface SessionPlayer {
   id: string;
@@ -34,6 +34,9 @@ export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'completed' | 'active'>('all');
+  // Session dont on demande la suppression ; la confirmation passe par une modale
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchSessions();
@@ -49,6 +52,26 @@ export default function SessionsPage() {
       console.error('Erreur:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!sessionToDelete || deleting) return;
+    setDeleting(true);
+
+    try {
+      const res = await fetch(`/api/sessions/${sessionToDelete.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Suppression refusée');
+
+      // On retire la ligne localement plutôt que de recharger : la liste est
+      // déjà en mémoire et le serveur vient de confirmer.
+      setSessions((prev) => prev.filter((s) => s.id !== sessionToDelete.id));
+      setSessionToDelete(null);
+    } catch (error) {
+      console.error('Erreur suppression session:', error);
+      alert('La session n\'a pas pu être supprimée.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -156,18 +179,26 @@ export default function SessionsPage() {
             const duration = getDuration(session);
 
             return (
-              <button
+              /*
+                La carte était un <button> englobant tout. Imbriquer la
+                corbeille dedans donnerait un bouton dans un bouton : on sépare
+                la zone cliquable de l'action de suppression.
+              */
+              <div
                 key={session.id}
-                onClick={() => {
-                  if (session.status === 'completed') {
-                    router.push(`/session/${session.id}/results`);
-                  } else {
-                    router.push(`/session/${session.id}`);
-                  }
-                }}
-                className="w-full group text-left"
+                className="group flex items-stretch bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] hover:bg-[rgba(0,191,255,0.08)] hover:border-[#00BFFF] rounded-xl transition-all overflow-hidden"
               >
-                <div className="bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] hover:bg-[rgba(0,191,255,0.08)] hover:border-[#00BFFF] active:scale-[0.99] rounded-xl p-5 mobile:p-3.5 transition-all">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (session.status === 'completed') {
+                      router.push(`/session/${session.id}/results`);
+                    } else {
+                      router.push(`/session/${session.id}`);
+                    }
+                  }}
+                  className="flex-1 min-w-0 text-left p-5 mobile:p-3.5 active:scale-[0.99] transition-transform"
+                >
                   {/* Sur mobile la carte passe sur deux lignes (infos puis vainqueur)
                       au lieu d'empiler chaque bloc, ce qui la rendait très haute. */}
                   <div className="flex items-center gap-5 mobile:gap-3">
@@ -281,10 +312,99 @@ export default function SessionsPage() {
                       </span>
                     </div>
                   )}
-                </div>
-              </button>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSessionToDelete(session)}
+                  className="shrink-0 w-14 mobile:w-11 flex items-center justify-center border-l border-[rgba(0,191,255,0.12)] text-[rgba(245,241,232,0.3)] hover:bg-[rgba(239,68,68,0.12)] hover:text-red-400 active:scale-90 transition-all"
+                  aria-label={`Supprimer la session du ${new Date(session.date).toLocaleDateString('fr-FR')}`}
+                >
+                  <Trash2 size={18} className="mobile:w-4 mobile:h-4" />
+                </button>
+              </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Confirmation de suppression */}
+      {sessionToDelete && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => !deleting && setSessionToDelete(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmer la suppression"
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl bg-[#0A1628] border border-red-500/30 animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 px-6 py-5 mobile:px-4 mobile:py-4 border-b border-red-500/20 bg-gradient-to-r from-red-500/10 to-transparent">
+              <div className="w-11 h-11 shrink-0 rounded-full bg-red-500/20 flex items-center justify-center">
+                <Trash2 size={20} className="text-red-400" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-[#F5F1E8]">Supprimer cette session ?</h2>
+                <p className="text-xs text-[rgba(245,241,232,0.55)] mt-0.5 truncate">
+                  {new Date(sessionToDelete.date).toLocaleDateString('fr-FR', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                  })}
+                  {' · '}
+                  {sessionToDelete.court.name}
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 mobile:px-4 space-y-3">
+              <p className="text-sm text-[#F5F1E8]">
+                {sessionToDelete.sessionPlayers.length > 1
+                  ? `Les ${sessionToDelete.sessionPlayers.length} joueurs de la session et tous leurs tirs enregistrés seront effacés.`
+                  : 'Le joueur de la session et tous ses tirs enregistrés seront effacés.'}
+                {' '}
+                Les fiches joueur, elles, sont conservées.
+              </p>
+
+              {/* Une session terminée compte dans les statistiques : on le dit. */}
+              {sessionToDelete.status === 'completed' && (
+                <p className="text-sm text-[#FFB400] bg-[rgba(255,180,0,0.08)] border border-[rgba(255,180,0,0.25)] rounded-lg px-3 py-2">
+                  Cette session est terminée : elle compte dans les statistiques et les
+                  moyennes, qui changeront après suppression.
+                </p>
+              )}
+
+              <p className="text-xs text-[rgba(245,241,232,0.45)]">Cette action est définitive.</p>
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 mobile:px-4 bg-[rgba(245,241,232,0.02)] border-t border-[rgba(245,241,232,0.05)]">
+              <button
+                type="button"
+                onClick={() => setSessionToDelete(null)}
+                disabled={deleting}
+                className="flex-1 px-4 py-3 rounded-xl bg-[rgba(245,241,232,0.08)] text-[#F5F1E8] font-bold text-sm hover:bg-[rgba(245,241,232,0.15)] active:scale-95 transition-all disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 active:scale-95 transition-all shadow-lg shadow-red-500/30 disabled:opacity-60"
+              >
+                {deleting ? (
+                  <span>Suppression...</span>
+                ) : (
+                  <>
+                    <X size={16} />
+                    <span>Supprimer</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
