@@ -5,20 +5,43 @@ import { prisma } from '@/lib/prisma';
 const isMid = (label: string) => label?.includes('MID') && !label?.includes('LANCER FRANC');
 const isThree = (label: string) => label?.includes('3 PTS') || label?.includes('3PTS');
 
+/** Tirs tentés par spot, et lancers francs de validation par spot. */
+const SHOTS_PER_SPOT = 10;
+const FT_PER_SPOT = 2;
+
+interface Tally {
+  makes: number;
+  attempts: number;
+}
+
 interface PlayerAcc {
   playerId: string;
   firstName: string;
   lastName: string;
   photo: string | null;
   avatar: string;
-  midTotal: number;
-  midMakes: number;
-  threeTotal: number;
-  threeMakes: number;
-  ftTotal: number;
-  ftMakes: number;
-  spotStats: Record<number, { total: number; makes: number }>;
+  sessions: number;
+  mid: Tally;
+  three: Tally;
+  ft: Tally;
+  spotStats: Record<number, Tally>;
   spotNames: Record<number, { label: string; sub: string }>;
+}
+
+/**
+ * Pourcentage de réussite, accompagné de son volume.
+ *
+ * Le taux seul ne veut rien dire : un joueur venu une fois, qui met son seul
+ * lancer franc, afficherait 100 %. L'écran a besoin du nombre de tirs pour
+ * afficher « 67,3 % (350/520) » et pour écarter du classement les volumes trop
+ * faibles.
+ */
+function withRate(tally: Tally) {
+  return {
+    makes: tally.makes,
+    attempts: tally.attempts,
+    rate: tally.attempts > 0 ? Math.round((tally.makes / tally.attempts) * 1000) / 10 : 0,
+  };
 }
 
 export async function GET() {
@@ -43,35 +66,39 @@ export async function GET() {
           lastName: sp.player.lastName,
           photo: sp.player.photo,
           avatar: sp.player.avatar,
-          midTotal: 0,
-          midMakes: 0,
-          threeTotal: 0,
-          threeMakes: 0,
-          ftTotal: 0,
-          ftMakes: 0,
+          sessions: 0,
+          mid: { makes: 0, attempts: 0 },
+          three: { makes: 0, attempts: 0 },
+          ft: { makes: 0, attempts: 0 },
           spotStats: {},
           spotNames: {},
         };
       }
 
+      // Une session sans aucun spot saisi ne compte pas : elle ne dit rien du
+      // niveau du joueur et gonflerait le volume affiché.
+      if (sp.spotResults.length > 0) {
+        acc[playerId].sessions += 1;
+      }
+
       sp.spotResults.forEach(sr => {
         // Stats générales - FILTRE CORRIGÉ
         if (isMid(sr.spotLabel)) {
-          acc[playerId].midTotal += 10;
-          acc[playerId].midMakes += sr.makes;
+          acc[playerId].mid.attempts += SHOTS_PER_SPOT;
+          acc[playerId].mid.makes += sr.makes;
         } else if (isThree(sr.spotLabel)) {
-          acc[playerId].threeTotal += 10;
-          acc[playerId].threeMakes += sr.makes;
+          acc[playerId].three.attempts += SHOTS_PER_SPOT;
+          acc[playerId].three.makes += sr.makes;
         }
-        acc[playerId].ftTotal += 2;
-        acc[playerId].ftMakes += sr.ftMakes;
+        acc[playerId].ft.attempts += FT_PER_SPOT;
+        acc[playerId].ft.makes += sr.ftMakes;
 
         // Stats par spot
         if (!acc[playerId].spotStats[sr.spotNum]) {
-          acc[playerId].spotStats[sr.spotNum] = { total: 0, makes: 0 };
+          acc[playerId].spotStats[sr.spotNum] = { makes: 0, attempts: 0 };
           acc[playerId].spotNames[sr.spotNum] = { label: sr.spotLabel, sub: sr.spotSub };
         }
-        acc[playerId].spotStats[sr.spotNum].total += 10;
+        acc[playerId].spotStats[sr.spotNum].attempts += SHOTS_PER_SPOT;
         acc[playerId].spotStats[sr.spotNum].makes += sr.makes;
       });
 
@@ -79,10 +106,10 @@ export async function GET() {
     }, {} as Record<string, PlayerAcc>);
 
     const playersArray = Object.values(playerStats).map((player) => {
-      const spotRates: Record<number, number> = {};
+      const spots: Record<number, ReturnType<typeof withRate>> = {};
 
-      Object.entries(player.spotStats).forEach(([spotNum, stats]) => {
-        spotRates[parseInt(spotNum)] = (stats.makes / stats.total) * 100;
+      Object.entries(player.spotStats).forEach(([spotNum, tally]) => {
+        spots[parseInt(spotNum)] = withRate(tally);
       });
 
       return {
@@ -91,10 +118,11 @@ export async function GET() {
         lastName: player.lastName,
         photo: player.photo,
         avatar: player.avatar,
-        midRate: player.midTotal > 0 ? Math.round((player.midMakes / player.midTotal) * 1000) / 10 : 0,
-        threePointRate: player.threeTotal > 0 ? Math.round((player.threeMakes / player.threeTotal) * 1000) / 10 : 0,
-        ftRate: player.ftTotal > 0 ? Math.round((player.ftMakes / player.ftTotal) * 1000) / 10 : 0,
-        spotRates,
+        sessions: player.sessions,
+        mid: withRate(player.mid),
+        three: withRate(player.three),
+        ft: withRate(player.ft),
+        spots,
         spotNames: player.spotNames,
       };
     });

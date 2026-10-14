@@ -85,9 +85,16 @@ export async function GET() {
     let bestFtPlayer = '';
     let bestFtAttempts = 0;
 
+    /*
+      Volume minimum pour prétendre au record, aligné sur le classement des
+      joueurs : deux sessions, soit quarante lancers francs. En dessous, un
+      joueur venu une fois peut décrocher le record sur une poignée de tirs.
+    */
+    const MIN_FT_ATTEMPTS = 40;
+
     Object.entries(ftStats).forEach(([playerName, stats]) => {
       const rate = (stats.totalMakes / stats.totalAttempts) * 100;
-      if (rate > bestFtRate && stats.totalAttempts >= 20) {
+      if (rate > bestFtRate && stats.totalAttempts >= MIN_FT_ATTEMPTS) {
         bestFtRate = rate;
         bestFtPlayer = playerName;
         bestFtAttempts = stats.totalAttempts;

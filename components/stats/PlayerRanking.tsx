@@ -2,28 +2,53 @@
 
 import { useState, useEffect } from 'react';
 
+interface Rate {
+  makes: number;
+  attempts: number;
+  rate: number;
+}
+
 interface PlayerStat {
   playerId: string;
   firstName: string;
   lastName: string;
   photo: string | null;
   avatar: string;
-  midRate: number;
-  threePointRate: number;
-  ftRate: number;
-  spotRates: Record<number, number>;
+  sessions: number;
+  mid: Rate;
+  three: Rate;
+  ft: Rate;
+  spots: Record<number, Rate>;
   spotNames: Record<number, { label: string; sub: string }>;
 }
 
-type GeneralKey = 'midRate' | 'threePointRate' | 'ftRate';
+type GeneralKey = 'mid' | 'three' | 'ft';
 
 const isThreeLabel = (label: string) => label?.includes('3 PTS') || label?.includes('3PTS');
 
 const GENERAL_FILTERS: { key: GeneralKey; label: string; short: string; color: string }[] = [
-  { key: 'midRate', label: '% Mid-Range', short: 'Mid', color: '#00BFFF' },
-  { key: 'threePointRate', label: '% 3 Points', short: '3 pts', color: '#FFD700' },
-  { key: 'ftRate', label: '% Lancers Francs', short: 'LF', color: '#22C55E' },
+  { key: 'mid', label: '% Mid-Range', short: 'Mid', color: '#00BFFF' },
+  { key: 'three', label: '% 3 Points', short: '3 pts', color: '#FFD700' },
+  { key: 'ft', label: '% Lancers Francs', short: 'LF', color: '#22C55E' },
 ];
+
+/*
+  Volume minimum pour entrer au classement.
+
+  Un pourcentage sans volume ne compare rien : un joueur venu une seule fois,
+  qui met son unique lancer franc, affiche 100 % et passe devant celui qui tire
+  depuis deux ans. Les joueurs sous le seuil restent affichés, à part et avec
+  leur volume — ils ne sont pas cachés, ils ne sont simplement pas classés.
+*/
+const MIN_SESSIONS = 2;
+const MIN_ATTEMPTS = 20;
+
+/** Un spot n'est tiré qu'une fois par session : deux passages au minimum. */
+const MIN_SPOT_ATTEMPTS = 20;
+
+function isRanked(player: PlayerStat, key: GeneralKey): boolean {
+  return player.sessions >= MIN_SESSIONS && player[key].attempts >= MIN_ATTEMPTS;
+}
 
 /** Or, argent, bronze pour le podium, gris ensuite. */
 function rankColor(index: number) {
@@ -47,10 +72,24 @@ function Avatar({ player, size }: { player: PlayerStat; size: string }) {
   );
 }
 
+/** Taux et volume : « 52.7% » au-dessus de « 548/1040 ». */
+function RateCell({ value, color, className = '' }: { value: Rate; color: string; className?: string }) {
+  return (
+    <div className={className}>
+      <div className="font-mono text-lg font-bold" style={{ color }}>
+        {value.rate.toFixed(1)}%
+      </div>
+      <div className="font-mono text-[11px] text-[rgba(245,241,232,0.35)]">
+        {value.makes}/{value.attempts}
+      </div>
+    </div>
+  );
+}
+
 export function PlayerRanking() {
   const [players, setPlayers] = useState<PlayerStat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generalFilter, setGeneralFilter] = useState<GeneralKey>('midRate');
+  const [generalFilter, setGeneralFilter] = useState<GeneralKey>('mid');
   const [spotFilter, setSpotFilter] = useState<number | ''>(1);
 
   useEffect(() => {
@@ -69,12 +108,26 @@ export function PlayerRanking() {
     }
   };
 
-  const sortedByGeneral = [...players].sort((a, b) => b[generalFilter] - a[generalFilter]);
+  const byGeneral = (a: PlayerStat, b: PlayerStat) =>
+    b[generalFilter].rate - a[generalFilter].rate;
 
-  const sortedBySpot = [...players].sort((a, b) => {
-    if (spotFilter === '') return 0;
-    return (b.spotRates[spotFilter] || 0) - (a.spotRates[spotFilter] || 0);
-  });
+  const rankedGeneral = players.filter((p) => isRanked(p, generalFilter)).sort(byGeneral);
+  // Les non-classés sont triés par volume : le plus proche du seuil en premier.
+  const unrankedGeneral = players
+    .filter((p) => !isRanked(p, generalFilter))
+    .sort((a, b) => b[generalFilter].attempts - a[generalFilter].attempts);
+
+  const spotAttempts = (player: PlayerStat) =>
+    spotFilter === '' ? 0 : player.spots[spotFilter]?.attempts ?? 0;
+  const spotRate = (player: PlayerStat) =>
+    spotFilter === '' ? 0 : player.spots[spotFilter]?.rate ?? 0;
+
+  const rankedBySpot = players
+    .filter((p) => spotAttempts(p) >= MIN_SPOT_ATTEMPTS)
+    .sort((a, b) => spotRate(b) - spotRate(a));
+  const unrankedBySpot = players
+    .filter((p) => spotAttempts(p) > 0 && spotAttempts(p) < MIN_SPOT_ATTEMPTS)
+    .sort((a, b) => spotAttempts(b) - spotAttempts(a));
 
   const spotOptions =
     players.length > 0 && players[0].spotNames
@@ -133,19 +186,20 @@ export function PlayerRanking() {
 
         {/* Desktop : tableau */}
         <div className="mobile:hidden bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl overflow-hidden">
-          <div className="grid grid-cols-[60px_1fr_120px_120px_120px] gap-4 p-4 border-b border-[rgba(0,191,255,0.15)] bg-[rgba(0,191,255,0.04)]">
+          <div className="grid grid-cols-[60px_1fr_90px_120px_120px_120px] gap-4 p-4 border-b border-[rgba(0,191,255,0.15)] bg-[rgba(0,191,255,0.04)]">
             <div className="text-xs font-bold text-[rgba(245,241,232,0.35)] uppercase">#</div>
             <div className="text-xs font-bold text-[rgba(245,241,232,0.35)] uppercase">Joueur</div>
+            <div className="text-xs font-bold text-[rgba(245,241,232,0.35)] uppercase">Sessions</div>
             <div className="text-xs font-bold text-[rgba(245,241,232,0.35)] uppercase">% Mid</div>
             <div className="text-xs font-bold text-[rgba(245,241,232,0.35)] uppercase">% 3pts</div>
             <div className="text-xs font-bold text-[rgba(245,241,232,0.35)] uppercase">% LF</div>
           </div>
 
           <div className="divide-y divide-[rgba(0,191,255,0.08)]">
-            {sortedByGeneral.map((player, index) => (
+            {rankedGeneral.map((player, index) => (
               <div
                 key={player.playerId}
-                className="grid grid-cols-[60px_1fr_120px_120px_120px] gap-4 p-4 hover:bg-[rgba(0,191,255,0.04)] transition-colors items-center"
+                className="grid grid-cols-[60px_1fr_90px_120px_120px_120px] gap-4 p-4 hover:bg-[rgba(0,191,255,0.04)] transition-colors items-center"
               >
                 <div className={`font-mono font-bold text-lg ${rankColor(index)}`}>#{index + 1}</div>
                 <div className="flex items-center gap-3 min-w-0">
@@ -154,11 +208,39 @@ export function PlayerRanking() {
                     {player.firstName} {player.lastName}
                   </div>
                 </div>
-                <div className="font-mono text-lg font-bold text-[#00BFFF]">{player.midRate.toFixed(1)}%</div>
-                <div className="font-mono text-lg font-bold text-[#FFD700]">{player.threePointRate.toFixed(1)}%</div>
-                <div className="font-mono text-lg font-bold text-green-400">{player.ftRate.toFixed(1)}%</div>
+                <div className="font-mono text-sm text-[rgba(245,241,232,0.55)]">{player.sessions}</div>
+                <RateCell value={player.mid} color="#00BFFF" />
+                <RateCell value={player.three} color="#FFD700" />
+                <RateCell value={player.ft} color="#22C55E" />
               </div>
             ))}
+
+            {/* Volume trop faible : affichés, mais hors classement. */}
+            {unrankedGeneral.length > 0 && (
+              <>
+                <div className="px-4 py-2.5 bg-[rgba(245,241,232,0.02)] text-[11px] font-mono uppercase tracking-wider text-[rgba(245,241,232,0.35)]">
+                  Hors classement — moins de {MIN_SESSIONS} sessions
+                </div>
+                {unrankedGeneral.map((player) => (
+                  <div
+                    key={player.playerId}
+                    className="grid grid-cols-[60px_1fr_90px_120px_120px_120px] gap-4 p-4 items-center opacity-50"
+                  >
+                    <div className="font-mono font-bold text-lg text-[rgba(245,241,232,0.2)]">—</div>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar player={player} size="w-10 h-10" />
+                      <div className="font-bold text-[#F5F1E8] truncate">
+                        {player.firstName} {player.lastName}
+                      </div>
+                    </div>
+                    <div className="font-mono text-sm text-[rgba(245,241,232,0.55)]">{player.sessions}</div>
+                    <RateCell value={player.mid} color="#00BFFF" />
+                    <RateCell value={player.three} color="#FFD700" />
+                    <RateCell value={player.ft} color="#22C55E" />
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
 
@@ -169,46 +251,30 @@ export function PlayerRanking() {
           étiquetés côte à côte et le critère de tri mis en avant.
         */}
         <div className="hidden mobile:block space-y-2">
-          {sortedByGeneral.map((player, index) => (
-            <div
+          {rankedGeneral.map((player, index) => (
+            <PlayerCardMobile
               key={player.playerId}
-              className="bg-gradient-to-br from-[rgba(0,191,255,0.05)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-xl p-3"
-            >
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <span className={`font-mono text-sm font-extrabold w-7 shrink-0 ${rankColor(index)}`}>
-                  #{index + 1}
-                </span>
-                <Avatar player={player} size="w-8 h-8" />
-                <span className="font-bold text-sm text-[#F5F1E8] truncate">
-                  {player.firstName} {player.lastName}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1.5">
-                {GENERAL_FILTERS.map(({ key, short, color }) => {
-                  const active = generalFilter === key;
-                  return (
-                    <div
-                      key={key}
-                      className="rounded-lg px-2 py-1.5 text-center transition-colors"
-                      style={{
-                        backgroundColor: active ? `${color}1f` : 'rgba(245,241,232,0.03)',
-                        boxShadow: active ? `inset 0 0 0 1px ${color}59` : 'none',
-                      }}
-                    >
-                      <div className="font-mono text-base font-extrabold leading-none" style={{ color }}>
-                        {player[key].toFixed(1)}
-                        <span className="text-[10px] opacity-60">%</span>
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-[rgba(245,241,232,0.45)] mt-1">
-                        {short}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+              player={player}
+              rank={index + 1}
+              generalFilter={generalFilter}
+            />
           ))}
+
+          {unrankedGeneral.length > 0 && (
+            <>
+              <div className="pt-2 pb-1 text-[10px] font-mono uppercase tracking-wider text-[rgba(245,241,232,0.35)]">
+                Hors classement — moins de {MIN_SESSIONS} sessions
+              </div>
+              {unrankedGeneral.map((player) => (
+                <PlayerCardMobile
+                  key={player.playerId}
+                  player={player}
+                  rank={null}
+                  generalFilter={generalFilter}
+                />
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -253,42 +319,152 @@ export function PlayerRanking() {
             </div>
 
             <div className="divide-y divide-[rgba(0,191,255,0.08)]">
-              {sortedBySpot.map((player, index) => {
-                const rate = player.spotRates[spotFilter as number] || 0;
-                const color = getSpotColor(spotFilter as number);
+              {rankedBySpot.map((player, index) => (
+                <SpotRow
+                  key={player.playerId}
+                  player={player}
+                  rank={index + 1}
+                  value={player.spots[spotFilter as number]}
+                  color={getSpotColor(spotFilter as number)}
+                />
+              ))}
 
-                return (
-                  <div
-                    key={player.playerId}
-                    className="grid grid-cols-[60px_1fr_150px] gap-4 p-4 items-center hover:bg-[rgba(0,191,255,0.04)] transition-colors mobile:flex mobile:gap-2.5 mobile:p-2.5"
-                  >
-                    <div className={`font-mono font-bold text-lg mobile:text-sm mobile:w-7 mobile:shrink-0 ${rankColor(index)}`}>
-                      #{index + 1}
-                    </div>
-
-                    <div className="flex items-center gap-3 mobile:gap-2 min-w-0 mobile:flex-1">
-                      <Avatar player={player} size="w-10 h-10 mobile:w-8 mobile:h-8" />
-                      <div className="font-bold text-[#F5F1E8] mobile:text-sm truncate">
-                        {player.firstName} {player.lastName}
-                      </div>
-                    </div>
-
-                    {/* Mobile : barre de niveau sous le pourcentage, pour comparer d'un coup d'œil */}
-                    <div className="font-mono text-lg mobile:text-base font-bold mobile:shrink-0 mobile:w-20 mobile:text-right" style={{ color }}>
-                      {rate.toFixed(1)}%
-                      <div className="hidden mobile:block mt-1 h-1 rounded-full bg-[rgba(245,241,232,0.07)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${Math.min(100, Math.max(0, rate))}%`, backgroundColor: color }}
-                        />
-                      </div>
-                    </div>
+              {unrankedBySpot.length > 0 && (
+                <>
+                  <div className="px-4 py-2.5 mobile:px-2.5 bg-[rgba(245,241,232,0.02)] text-[11px] mobile:text-[10px] font-mono uppercase tracking-wider text-[rgba(245,241,232,0.35)]">
+                    Hors classement — un seul passage sur ce spot
                   </div>
-                );
-              })}
+                  {unrankedBySpot.map((player) => (
+                    <SpotRow
+                      key={player.playerId}
+                      player={player}
+                      rank={null}
+                      value={player.spots[spotFilter as number]}
+                      color={getSpotColor(spotFilter as number)}
+                    />
+                  ))}
+                </>
+              )}
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Une carte joueur en mobile. `rank` à `null` = hors classement. */
+function PlayerCardMobile({
+  player,
+  rank,
+  generalFilter,
+}: {
+  player: PlayerStat;
+  rank: number | null;
+  generalFilter: GeneralKey;
+}) {
+  return (
+    <div
+      className={`bg-gradient-to-br from-[rgba(0,191,255,0.05)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-xl p-3 ${
+        rank === null ? 'opacity-50' : ''
+      }`}
+    >
+      <div className="flex items-center gap-2.5 mb-2.5">
+        <span
+          className={`font-mono text-sm font-extrabold w-7 shrink-0 ${
+            rank === null ? 'text-[rgba(245,241,232,0.2)]' : rankColor(rank - 1)
+          }`}
+        >
+          {rank === null ? '—' : `#${rank}`}
+        </span>
+        <Avatar player={player} size="w-8 h-8" />
+        <span className="font-bold text-sm text-[#F5F1E8] truncate flex-1 min-w-0">
+          {player.firstName} {player.lastName}
+        </span>
+        <span className="font-mono text-[10px] text-[rgba(245,241,232,0.35)] shrink-0">
+          {player.sessions} sess.
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5">
+        {GENERAL_FILTERS.map(({ key, short, color }) => {
+          const active = generalFilter === key;
+          const value = player[key];
+          return (
+            <div
+              key={key}
+              className="rounded-lg px-2 py-1.5 text-center transition-colors"
+              style={{
+                backgroundColor: active ? `${color}1f` : 'rgba(245,241,232,0.03)',
+                boxShadow: active ? `inset 0 0 0 1px ${color}59` : 'none',
+              }}
+            >
+              <div className="font-mono text-base font-extrabold leading-none" style={{ color }}>
+                {value.rate.toFixed(1)}
+                <span className="text-[10px] opacity-60">%</span>
+              </div>
+              {/* Le volume, sans quoi un 100 % sur deux tirs passe pour un exploit. */}
+              <div className="font-mono text-[9px] text-[rgba(245,241,232,0.4)] mt-0.5">
+                {value.makes}/{value.attempts}
+              </div>
+              <div className="text-[10px] uppercase tracking-wider text-[rgba(245,241,232,0.45)] mt-0.5">
+                {short}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Une ligne du classement par spot. `rank` à `null` = hors classement. */
+function SpotRow({
+  player,
+  rank,
+  value,
+  color,
+}: {
+  player: PlayerStat;
+  rank: number | null;
+  value?: Rate;
+  color: string;
+}) {
+  const rate = value?.rate ?? 0;
+
+  return (
+    <div
+      className={`grid grid-cols-[60px_1fr_150px] gap-4 p-4 items-center hover:bg-[rgba(0,191,255,0.04)] transition-colors mobile:flex mobile:gap-2.5 mobile:p-2.5 ${
+        rank === null ? 'opacity-50' : ''
+      }`}
+    >
+      <div
+        className={`font-mono font-bold text-lg mobile:text-sm mobile:w-7 mobile:shrink-0 ${
+          rank === null ? 'text-[rgba(245,241,232,0.2)]' : rankColor(rank - 1)
+        }`}
+      >
+        {rank === null ? '—' : `#${rank}`}
+      </div>
+
+      <div className="flex items-center gap-3 mobile:gap-2 min-w-0 mobile:flex-1">
+        <Avatar player={player} size="w-10 h-10 mobile:w-8 mobile:h-8" />
+        <div className="font-bold text-[#F5F1E8] mobile:text-sm truncate">
+          {player.firstName} {player.lastName}
+        </div>
+      </div>
+
+      {/* Mobile : barre de niveau sous le pourcentage, pour comparer d'un coup d'œil */}
+      <div className="font-mono text-lg mobile:text-base font-bold mobile:shrink-0 mobile:w-24 mobile:text-right" style={{ color }}>
+        {rate.toFixed(1)}%
+        <div className="font-mono text-[11px] mobile:text-[10px] font-normal text-[rgba(245,241,232,0.35)]">
+          {value?.makes ?? 0}/{value?.attempts ?? 0}
+        </div>
+        <div className="hidden mobile:block mt-1 h-1 rounded-full bg-[rgba(245,241,232,0.07)] overflow-hidden">
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${Math.min(100, Math.max(0, rate))}%`, backgroundColor: color }}
+          />
+        </div>
       </div>
     </div>
   );

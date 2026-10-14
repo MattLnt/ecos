@@ -131,11 +131,21 @@ export async function GET(request: Request) {
       ftRate: data.ftTotal > 0 ? Math.round((data.ftMakes / data.ftTotal) * 1000) / 10 : 0,
     }));
 
+    /*
+      Les volumes accompagnent les taux : un pourcentage seul ne dit pas s'il
+      repose sur dix tirs ou sur dix mille.
+    */
     return NextResponse.json({
       totalSessions,
       midRate: Math.round(midRate * 10) / 10,
+      midMakes,
+      midAttempts,
       threePointRate: Math.round(threePointRate * 10) / 10,
+      threeMakes,
+      threeAttempts,
       ftRate: Math.round(ftRate * 10) / 10,
+      ftMakes,
+      ftAttempts,
       evolution,
     });
   } catch (error) {

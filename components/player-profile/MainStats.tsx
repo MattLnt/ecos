@@ -4,11 +4,27 @@ import { Target } from 'lucide-react';
 
 interface MainStatsProps {
   midRate: number;
+  midMakes: number;
+  midAttempts: number;
   threePointRate: number;
+  threeMakes: number;
+  threeAttempts: number;
   ftRate: number;
+  ftMakes: number;
+  ftAttempts: number;
 }
 
-export function MainStats({ midRate, threePointRate, ftRate }: MainStatsProps) {
+export function MainStats({
+  midRate,
+  midMakes,
+  midAttempts,
+  threePointRate,
+  threeMakes,
+  threeAttempts,
+  ftRate,
+  ftMakes,
+  ftAttempts,
+}: MainStatsProps) {
   return (
     <div className="grid grid-cols-3 gap-5 mobile:grid-cols-1">
       <div className="bg-gradient-to-br from-[rgba(0,191,255,0.08)] to-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-6">
@@ -17,6 +33,9 @@ export function MainStats({ midRate, threePointRate, ftRate }: MainStatsProps) {
         </div>
         <div className="font-mono text-3xl font-extrabold text-[#00BFFF] mb-1">
           {midRate.toFixed(1)}%
+        </div>
+        <div className="font-mono text-xs text-[rgba(245,241,232,0.35)] mb-1">
+          {midMakes}/{midAttempts} tirs
         </div>
         <div className="text-sm text-[rgba(245,241,232,0.55)]">Mid-Range</div>
       </div>
@@ -28,6 +47,9 @@ export function MainStats({ midRate, threePointRate, ftRate }: MainStatsProps) {
         <div className="font-mono text-3xl font-extrabold text-[#FFD700] mb-1">
           {threePointRate.toFixed(1)}%
         </div>
+        <div className="font-mono text-xs text-[rgba(245,241,232,0.35)] mb-1">
+          {threeMakes}/{threeAttempts} tirs
+        </div>
         <div className="text-sm text-[rgba(245,241,232,0.55)]">3 Points</div>
       </div>
 
@@ -37,6 +59,9 @@ export function MainStats({ midRate, threePointRate, ftRate }: MainStatsProps) {
         </div>
         <div className="font-mono text-3xl font-extrabold text-green-400 mb-1">
           {ftRate.toFixed(1)}%
+        </div>
+        <div className="font-mono text-xs text-[rgba(245,241,232,0.35)] mb-1">
+          {ftMakes}/{ftAttempts} LF
         </div>
         <div className="text-sm text-[rgba(245,241,232,0.55)]">Lancers Francs</div>
       </div>

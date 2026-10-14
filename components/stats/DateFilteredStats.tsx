@@ -33,8 +33,14 @@ interface PlayerStat {
   avgPoints: number;
   sessionsPlayed: number;
   midRate: number;
+  midMakes: number;
+  midAttempts: number;
   threePointRate: number;
+  threeMakes: number;
+  threeAttempts: number;
   ftRate: number;
+  ftMakes: number;
+  ftAttempts: number;
   spots: PlayerSpotStat[];
 }
 
@@ -284,12 +290,21 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
                     </div>
                     <div className="hidden sm:block font-mono font-bold text-[#00BFFF]">
                       {player.midRate}%
+                      <div className="font-mono text-[11px] font-normal text-[rgba(245,241,232,0.35)]">
+                        {player.midMakes}/{player.midAttempts}
+                      </div>
                     </div>
                     <div className="hidden sm:block font-mono font-bold text-[#FFD700]">
                       {player.threePointRate}%
+                      <div className="font-mono text-[11px] font-normal text-[rgba(245,241,232,0.35)]">
+                        {player.threeMakes}/{player.threeAttempts}
+                      </div>
                     </div>
                     <div className="hidden sm:block font-mono font-bold text-green-400">
                       {player.ftRate}%
+                      <div className="font-mono text-[11px] font-normal text-[rgba(245,241,232,0.35)]">
+                        {player.ftMakes}/{player.ftAttempts}
+                      </div>
                     </div>
 
                     <ChevronRight size={18} className="hidden sm:block text-[rgba(245,241,232,0.3)]" />
@@ -314,14 +329,23 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
                       <div className="font-mono font-bold text-[#00BFFF]">{player.midRate}%</div>
+                      <div className="font-mono text-[10px] text-[rgba(245,241,232,0.35)]">
+                        {player.midMakes}/{player.midAttempts}
+                      </div>
                       <div className="text-[10px] text-[rgba(245,241,232,0.4)]">MID</div>
                     </div>
                     <div>
                       <div className="font-mono font-bold text-[#FFD700]">{player.threePointRate}%</div>
+                      <div className="font-mono text-[10px] text-[rgba(245,241,232,0.35)]">
+                        {player.threeMakes}/{player.threeAttempts}
+                      </div>
                       <div className="text-[10px] text-[rgba(245,241,232,0.4)]">3 PTS</div>
                     </div>
                     <div>
                       <div className="font-mono font-bold text-green-400">{player.ftRate}%</div>
+                      <div className="font-mono text-[10px] text-[rgba(245,241,232,0.35)]">
+                        {player.ftMakes}/{player.ftAttempts}
+                      </div>
                       <div className="text-[10px] text-[rgba(245,241,232,0.4)]">LF</div>
                     </div>
                   </div>
@@ -436,14 +460,23 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
               <div className="grid grid-cols-3 gap-2 mt-4">
                 <div className="rounded-lg bg-[rgba(0,191,255,0.06)] px-3 py-2 text-center">
                   <div className="font-mono font-bold text-[#00BFFF]">{selectedPlayer.midRate}%</div>
+                  <div className="font-mono text-[10px] text-[rgba(245,241,232,0.35)]">
+                    {selectedPlayer.midMakes}/{selectedPlayer.midAttempts}
+                  </div>
                   <div className="text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-wider">Mid</div>
                 </div>
                 <div className="rounded-lg bg-[rgba(255,215,0,0.06)] px-3 py-2 text-center">
                   <div className="font-mono font-bold text-[#FFD700]">{selectedPlayer.threePointRate}%</div>
+                  <div className="font-mono text-[10px] text-[rgba(245,241,232,0.35)]">
+                    {selectedPlayer.threeMakes}/{selectedPlayer.threeAttempts}
+                  </div>
                   <div className="text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-wider">3 pts</div>
                 </div>
                 <div className="rounded-lg bg-[rgba(34,197,94,0.06)] px-3 py-2 text-center">
                   <div className="font-mono font-bold text-green-400">{selectedPlayer.ftRate}%</div>
+                  <div className="font-mono text-[10px] text-[rgba(245,241,232,0.35)]">
+                    {selectedPlayer.ftMakes}/{selectedPlayer.ftAttempts}
+                  </div>
                   <div className="text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-wider">LF</div>
                 </div>
               </div>

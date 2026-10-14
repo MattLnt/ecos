@@ -8,8 +8,14 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
 interface OverviewData {
   totalSessions: number;
   midRate: number;
+  midMakes: number;
+  midAttempts: number;
   threePointRate: number;
+  threeMakes: number;
+  threeAttempts: number;
   ftRate: number;
+  ftMakes: number;
+  ftAttempts: number;
   evolution: Array<{
     date: string;
     midRate: number;
@@ -66,10 +72,28 @@ export function OverviewStats() {
     resserre, et le libellé tient sur une ligne.
   */
   const kpis = [
-    { icon: CalendarDays, value: String(data.totalSessions), label: 'Sessions', color: '#00BFFF' },
-    { icon: Target, value: `${data.midRate.toFixed(1)}%`, label: 'Mid-range', color: '#00BFFF' },
-    { icon: Zap, value: `${data.threePointRate.toFixed(1)}%`, label: '3 points', color: '#FFD700' },
-    { icon: Crosshair, value: `${data.ftRate.toFixed(1)}%`, label: 'Lancers francs', color: '#22C55E' },
+    { icon: CalendarDays, value: String(data.totalSessions), volume: null, label: 'Sessions', color: '#00BFFF' },
+    {
+      icon: Target,
+      value: `${data.midRate.toFixed(1)}%`,
+      volume: `${data.midMakes}/${data.midAttempts} tirs`,
+      label: 'Mid-range',
+      color: '#00BFFF',
+    },
+    {
+      icon: Zap,
+      value: `${data.threePointRate.toFixed(1)}%`,
+      volume: `${data.threeMakes}/${data.threeAttempts} tirs`,
+      label: '3 points',
+      color: '#FFD700',
+    },
+    {
+      icon: Crosshair,
+      value: `${data.ftRate.toFixed(1)}%`,
+      volume: `${data.ftMakes}/${data.ftAttempts} LF`,
+      label: 'Lancers francs',
+      color: '#22C55E',
+    },
   ];
 
   const periodUnit =
@@ -83,7 +107,7 @@ export function OverviewStats() {
     <div className="space-y-5 mobile:space-y-4">
       {/* Chiffres clés */}
       <div className="grid grid-cols-4 gap-4 mobile:grid-cols-2 mobile:gap-2.5">
-        {kpis.map(({ icon: Icon, value, label, color }) => (
+        {kpis.map(({ icon: Icon, value, volume, label, color }) => (
           <div
             key={label}
             className="relative overflow-hidden bg-gradient-to-br from-[rgba(0,191,255,0.08)] to-[rgba(0,191,255,0.03)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-5 mobile:rounded-xl mobile:p-3.5"
@@ -100,6 +124,13 @@ export function OverviewStats() {
               >
                 {value}
               </div>
+              {/* Le volume sous le taux : sans lui, 100 % sur deux tirs se lit
+                  comme un sans-faute. */}
+              {volume && (
+                <div className="font-mono text-[11px] mobile:text-[10px] text-[rgba(245,241,232,0.35)] mt-1">
+                  {volume}
+                </div>
+              )}
               <div className="text-sm mobile:text-[11px] text-[rgba(245,241,232,0.55)] mt-2 mobile:mt-1.5 mobile:uppercase mobile:tracking-wider mobile:leading-tight">
                 {label}
               </div>

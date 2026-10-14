@@ -141,8 +141,16 @@ export async function GET(
       bestScore,
       victories,
       midRate: Math.round(midRate * 10) / 10,
+      // Les volumes vont avec les taux : 100 % sur deux tirs n'est pas un
+      // sans-faute, et seul le nombre de tirs permet de le voir.
+      midMakes,
+      midAttempts,
       threePointRate: Math.round(threePointRate * 10) / 10,
+      threeMakes,
+      threeAttempts,
       ftRate: Math.round(ftRate * 10) / 10,
+      ftMakes,
+      ftAttempts,
       recentSessions,
       evolution,
       spotPerformance,

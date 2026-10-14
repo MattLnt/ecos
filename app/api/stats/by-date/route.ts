@@ -187,8 +187,16 @@ export async function GET(request: Request) {
         avgPoints: Math.round((p.totalPoints / p.sessionsPlayed) * 10) / 10,
         sessionsPlayed: p.sessionsPlayed,
         midRate: p.midTotal > 0 ? Math.round((p.midMakes / p.midTotal) * 1000) / 10 : 0,
+        // Les volumes voyagent avec les taux : un pourcentage seul ne dit pas
+        // sur combien de tirs il repose.
+        midMakes: p.midMakes,
+        midAttempts: p.midTotal,
         threePointRate: p.threeTotal > 0 ? Math.round((p.threeMakes / p.threeTotal) * 1000) / 10 : 0,
+        threeMakes: p.threeMakes,
+        threeAttempts: p.threeTotal,
         ftRate: p.ftTotal > 0 ? Math.round((p.ftMakes / p.ftTotal) * 1000) / 10 : 0,
+        ftMakes: p.ftMakes,
+        ftAttempts: p.ftTotal,
         spots: Object.values(p.spots)
           .map((ps) => ({
             spotNum: ps.spotNum,

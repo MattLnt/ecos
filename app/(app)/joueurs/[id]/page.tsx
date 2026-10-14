@@ -24,8 +24,14 @@ interface PlayerProfile {
   bestScore: number;
   victories: number;
   midRate: number;
+  midMakes: number;
+  midAttempts: number;
   threePointRate: number;
+  threeMakes: number;
+  threeAttempts: number;
   ftRate: number;
+  ftMakes: number;
+  ftAttempts: number;
   recentSessions: Array<{
     id: string;
     date: string;
@@ -111,8 +117,14 @@ export default function PlayerProfilePage() {
 
       <MainStats
         midRate={player.midRate}
+        midMakes={player.midMakes}
+        midAttempts={player.midAttempts}
         threePointRate={player.threePointRate}
+        threeMakes={player.threeMakes}
+        threeAttempts={player.threeAttempts}
         ftRate={player.ftRate}
+        ftMakes={player.ftMakes}
+        ftAttempts={player.ftAttempts}
       />
 
       <div className="grid grid-cols-2 gap-6 mobile:grid-cols-1">
