@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Trophy, Home, ChevronRight, X } from 'lucide-react';
+import { groupKeysOf, groupOf } from '@/lib/groups';
 
 interface Player {
   id: string;
@@ -27,6 +28,8 @@ interface SessionPlayer {
   totalPoints: number;
   rank: number | null;
   spotResults: SpotResult[];
+  group: string | null;
+  shootOrder: number;
 }
 
 interface Session {
@@ -49,6 +52,8 @@ export default function ResultsPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState<SessionPlayer | null>(null);
+  // Classement affiché : général, ou un bloc par groupe de tir.
+  const [scope, setScope] = useState<'all' | 'groups'>('all');
 
   useEffect(() => {
     fetchResults();
@@ -79,7 +84,20 @@ export default function ResultsPage() {
 
   if (!session) return null;
 
-  const rankedPlayers = [...session.sessionPlayers].sort((a, b) => b.totalPoints - a.totalPoints);
+  const byPoints = (a: SessionPlayer, b: SessionPlayer) => b.totalPoints - a.totalPoints;
+  const rankedPlayers = [...session.sessionPlayers].sort(byPoints);
+
+  /*
+    Les groupes de tir d'un entraînement à plusieurs paniers. Le classement
+    général reste la référence — le classement de groupe dit juste qui a gagné
+    son panier, ce qui est la seule comparaison vécue pendant la séance.
+  */
+  const groupKeys = groupKeysOf(session.sessionPlayers);
+  const hasGroups = groupKeys.length > 1;
+  const rankedGroups = groupKeys.map((key) => ({
+    key,
+    players: session.sessionPlayers.filter((sp) => groupOf(sp) === key).sort(byPoints),
+  }));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0A1628] via-[#0d1f38] to-[#0A1628] pt-safe-t">
@@ -173,9 +191,84 @@ export default function ResultsPage() {
 
         {/* Classement complet */}
         <div className="bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-6 mobile:p-3 backdrop-blur-sm mb-8 mobile:mb-6">
-          <h2 className="font-mono text-[11px] mobile:text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-5 mobile:mb-3">
-            Classement Complet
-          </h2>
+          <div className="flex items-center justify-between gap-2 mb-5 mobile:mb-3">
+            <h2 className="font-mono text-[11px] mobile:text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em]">
+              {scope === 'groups' ? 'Classement par groupe' : 'Classement Complet'}
+            </h2>
+            {hasGroups && (
+              <div className="flex items-center gap-1 p-0.5 shrink-0 rounded-lg bg-[rgba(0,191,255,0.06)] border border-[rgba(0,191,255,0.12)]">
+                {([
+                  { key: 'all', label: 'Général' },
+                  { key: 'groups', label: 'Groupes' },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setScope(key)}
+                    className={`px-3 py-1 rounded-md font-mono text-[10px] uppercase tracking-wider transition-all active:scale-95 ${
+                      scope === key
+                        ? 'bg-[#00BFFF] text-[#0A1628] font-bold'
+                        : 'text-[rgba(245,241,232,0.5)]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Un bloc par groupe : chacun a son vainqueur de panier. */}
+          {scope === 'groups' && hasGroups && (
+            <div className="space-y-5 mobile:space-y-4">
+              {rankedGroups.map((group) => (
+                <div key={group.key}>
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <div className="w-6 h-6 rounded-lg bg-[#00BFFF] text-[#0A1628] font-extrabold text-xs flex items-center justify-center shrink-0">
+                      {group.key}
+                    </div>
+                    <span className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.18em]">
+                      Groupe {group.key} · {group.players.length} joueurs
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {group.players.map((sp, index) => (
+                      <button
+                        key={sp.id}
+                        onClick={() => setSelectedPlayer(sp)}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center gap-3 mobile:gap-2.5 p-3 mobile:p-2.5 bg-[rgba(0,191,255,0.06)] hover:bg-[rgba(0,191,255,0.12)] border border-[rgba(0,191,255,0.15)] active:scale-[0.99] rounded-xl transition-all">
+                          <div className={`font-mono text-base font-extrabold w-6 text-center shrink-0 ${
+                            index === 0 ? 'text-[#FFD700]' : 'text-[rgba(245,241,232,0.35)]'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          {sp.player.photo ? (
+                            <img src={sp.player.photo} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                          ) : (
+                            <div
+                              className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-[#0A1628] shrink-0"
+                              style={{ backgroundColor: sp.player.avatar }}
+                            >
+                              {sp.player.firstName[0]}{sp.player.lastName[0]}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0 font-bold text-[#F5F1E8] text-sm truncate">
+                            {sp.player.firstName} {sp.player.lastName}
+                          </div>
+                          <div className="font-mono text-xl mobile:text-lg font-extrabold text-[#00BFFF] shrink-0">
+                            {sp.totalPoints}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(scope === 'all' || !hasGroups) && (
           <div className="space-y-3 mobile:space-y-2">
             {rankedPlayers.map((sp, index) => (
               <button
@@ -209,6 +302,7 @@ export default function ResultsPage() {
                       {sp.player.firstName} {sp.player.lastName}
                     </div>
                     <div className="font-mono text-xs mobile:text-[10px] text-[rgba(245,241,232,0.4)] truncate">
+                      {hasGroups && <>Groupe {groupOf(sp)} · </>}
                       {sp.spotResults.length} spots complétés
                     </div>
                   </div>
@@ -223,6 +317,7 @@ export default function ResultsPage() {
               </button>
             ))}
           </div>
+          )}
         </div>
 
         {/* Bouton retour */}

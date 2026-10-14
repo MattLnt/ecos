@@ -18,6 +18,7 @@ export async function GET(
               orderBy: { spotNum: 'asc' },
             },
           },
+          orderBy: [{ group: 'asc' }, { shootOrder: 'asc' }],
         },
       },
     });

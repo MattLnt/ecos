@@ -11,10 +11,26 @@ export async function GET(
       where: { id: params.id },
       include: {
         court: true,
+        /*
+          L'ordre compte : l'écran de saisie fait tourner les joueurs d'un
+          groupe dans leur ordre de passage, tiré au sort à la création. Sans
+          `orderBy`, Postgres rend les lignes dans un ordre non garanti et la
+          rotation changeait d'un rechargement à l'autre.
+        */
         sessionPlayers: {
           include: {
             player: true,
+            /*
+              Les spots déjà saisis : ils permettent de reprendre une session
+              interrompue là où elle s'est arrêtée. Sans eux, rouvrir une
+              session repartait du premier spot sur un terrain vierge alors que
+              les résultats étaient bien en base.
+            */
+            spotResults: {
+              orderBy: { spotNum: 'asc' },
+            },
           },
+          orderBy: [{ group: 'asc' }, { shootOrder: 'asc' }],
         },
       },
     });

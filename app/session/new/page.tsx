@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Target, Users, ChevronRight, Loader2 } from 'lucide-react';
+import { Target, Users, ChevronRight, Loader2, Shuffle, LayoutGrid } from 'lucide-react';
+import { drawGroups, GROUP_LABELS, MAX_GROUPS, type DrawnPlayer } from '@/lib/groups';
 
 interface Court {
   id: string;
@@ -20,6 +21,22 @@ interface Player {
   avatar: string;
 }
 
+/**
+ * Nombre de groupes conseillé : 3 à 4 joueurs par panier.
+ *
+ * C'est la taille qui marche en vrai — en dessous on attend trop entre deux
+ * tirs, au-dessus la rotation du groupe devient interminable.
+ */
+function suggestedGroupCount(playerCount: number): number {
+  if (playerCount <= 5) return 1;
+  return Math.min(MAX_GROUPS, Math.ceil(playerCount / 4));
+}
+
+/** Au moins deux joueurs par groupe, sinon le tirage n'a plus de sens. */
+function maxGroupsFor(playerCount: number): number {
+  return Math.max(1, Math.min(MAX_GROUPS, Math.floor(playerCount / 2)));
+}
+
 export default function NewSessionPage() {
   const router = useRouter();
   const [court, setCourt] = useState<Court | null>(null);
@@ -27,6 +44,16 @@ export default function NewSessionPage() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+
+  // Répartition : nombre de groupes et tirage au sort courant.
+  const [groupCount, setGroupCount] = useState(1);
+  const [draw, setDraw] = useState<DrawnPlayer[]>([]);
+  /*
+    Tant que le nombre de groupes n'a pas été choisi à la main, il suit la
+    suggestion : cocher onze joueurs propose trois groupes tout seul. Dès que
+    l'utilisateur tranche, on ne touche plus à son choix.
+  */
+  const groupCountTouched = useRef(false);
 
   useEffect(() => {
     fetchData();
@@ -61,13 +88,36 @@ export default function NewSessionPage() {
     }
   };
 
-  const togglePlayer = (playerId: string) => {
-    setSelectedPlayers((prev) =>
-      prev.includes(playerId)
-        ? prev.filter((id) => id !== playerId)
-        : [...prev, playerId]
-    );
+  /*
+    Toute modification de la sélection ou du nombre de groupes relance le
+    tirage : un tirage périmé, qui ne contiendrait pas le joueur qu'on vient
+    de cocher, ne doit jamais rester affiché.
+  */
+  const applyDraw = (playerIds: string[], count: number) => {
+    setDraw(playerIds.length > 0 ? drawGroups(playerIds, count) : []);
   };
+
+  const togglePlayer = (playerId: string) => {
+    const next = selectedPlayers.includes(playerId)
+      ? selectedPlayers.filter((id) => id !== playerId)
+      : [...selectedPlayers, playerId];
+
+    const count = groupCountTouched.current
+      ? Math.min(groupCount, maxGroupsFor(next.length))
+      : suggestedGroupCount(next.length);
+
+    setSelectedPlayers(next);
+    setGroupCount(count);
+    applyDraw(next, count);
+  };
+
+  const handleGroupCount = (count: number) => {
+    groupCountTouched.current = true;
+    setGroupCount(count);
+    applyDraw(selectedPlayers, count);
+  };
+
+  const handleReroll = () => applyDraw(selectedPlayers, groupCount);
 
   const handleCreateSession = async () => {
     if (selectedPlayers.length === 0) {
@@ -82,7 +132,8 @@ export default function NewSessionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           courtId: court?.id,
-          playerIds: selectedPlayers,
+          // Le tirage porte le groupe et l'ordre de passage de chaque joueur.
+          players: draw.length > 0 ? draw : drawGroups(selectedPlayers, groupCount),
         }),
       });
 
@@ -104,6 +155,19 @@ export default function NewSessionPage() {
       </div>
     );
   }
+
+  const playersById = new Map(players.map((p) => [p.id, p]));
+  const maxGroups = maxGroupsFor(selectedPlayers.length);
+
+  // Le tirage regroupé pour l'affichage, chaque groupe dans son ordre de passage.
+  const drawnGroups = GROUP_LABELS.filter((label) => draw.some((d) => d.group === label)).map(
+    (label) => ({
+      label,
+      members: draw
+        .filter((d) => d.group === label)
+        .sort((a, b) => a.shootOrder - b.shootOrder),
+    })
+  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8 pt-safe-t pb-[calc(8rem+env(safe-area-inset-bottom,0px))] sm:pb-8 px-3 sm:px-6">
@@ -220,6 +284,112 @@ export default function NewSessionPage() {
           </div>
         )}
       </div>
+
+      {/* Répartition en groupes + tirage au sort */}
+      {selectedPlayers.length > 0 && (
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <LayoutGrid size={20} className="text-[#00BFFF] sm:w-6 sm:h-6 flex-shrink-0" />
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-[#F5F1E8] truncate">
+                Répartition
+              </h2>
+            </div>
+            <button
+              onClick={handleReroll}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[rgba(0,191,255,0.1)] border border-[rgba(0,191,255,0.25)] rounded-lg text-[#00BFFF] text-xs sm:text-sm font-bold whitespace-nowrap hover:bg-[rgba(0,191,255,0.2)] active:scale-95 transition-all flex-shrink-0"
+            >
+              <Shuffle size={14} className="flex-shrink-0" />
+              <span>Relancer</span>
+            </button>
+          </div>
+
+          {/* Nombre de groupes */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {Array.from({ length: MAX_GROUPS }, (_, i) => i + 1).map((count) => {
+              const disabled = count > maxGroups;
+              const active = count === groupCount;
+              return (
+                <button
+                  key={count}
+                  onClick={() => handleGroupCount(count)}
+                  disabled={disabled}
+                  className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-bold transition-all active:scale-95 border ${
+                    active
+                      ? 'bg-[#00BFFF] text-[#0A1628] border-[#00BFFF]'
+                      : disabled
+                      ? 'bg-[rgba(245,241,232,0.03)] text-[rgba(245,241,232,0.2)] border-transparent cursor-not-allowed'
+                      : 'bg-[rgba(0,191,255,0.06)] text-[rgba(245,241,232,0.7)] border-[rgba(0,191,255,0.15)] hover:bg-[rgba(0,191,255,0.12)]'
+                  }`}
+                >
+                  {count === 1 ? '1 groupe' : `${count} groupes`}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="text-[10px] sm:text-xs text-[rgba(245,241,232,0.45)] font-mono leading-relaxed">
+            {groupCount === 1
+              ? "Un seul panier : l’ordre de passage est tiré au sort."
+              : `${groupCount} paniers en parallèle, un seul classement général. Groupes et ordre de passage tirés au sort.`}
+          </p>
+
+          {/* Groupes tirés */}
+          <div className={`grid gap-3 sm:gap-4 ${
+            drawnGroups.length === 1
+              ? 'grid-cols-1'
+              : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+          }`}>
+            {drawnGroups.map((group) => (
+              <div
+                key={group.label}
+                className="rounded-xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-3 sm:p-4"
+              >
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#00BFFF] text-[#0A1628] font-extrabold text-sm flex items-center justify-center flex-shrink-0">
+                      {group.label}
+                    </div>
+                    <span className="text-sm font-bold text-[#F5F1E8] truncate">
+                      {drawnGroups.length === 1 ? 'Ordre de passage' : `Groupe ${group.label}`}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-wider flex-shrink-0">
+                    {group.members.length} j.
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {group.members.map((member, index) => {
+                    const player = playersById.get(member.playerId);
+                    if (!player) return null;
+                    return (
+                      <div key={member.playerId} className="flex items-center gap-2.5">
+                        <span className="font-mono text-xs font-bold text-[rgba(245,241,232,0.35)] w-4 flex-shrink-0">
+                          {index + 1}
+                        </span>
+                        {player.photo ? (
+                          <img src={player.photo} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-[#0A1628] flex-shrink-0"
+                            style={{ backgroundColor: player.avatar }}
+                          >
+                            {player.firstName[0]}{player.lastName[0]}
+                          </div>
+                        )}
+                        <span className="text-sm font-semibold text-[#F5F1E8] truncate">
+                          {player.firstName} {player.lastName}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bouton démarrer - Fixed bottom sur mobile, sticky sur desktop */}
       <div className="fixed bottom-0 left-0 right-0 px-3 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-[#0A1628] via-[#0A1628] to-transparent sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:px-0 sm:pt-4 sm:pb-0 sm:bg-none sm:sticky sm:bottom-6 z-30">

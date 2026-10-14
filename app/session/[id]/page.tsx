@@ -4,8 +4,16 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Court } from '@/components/shooting/Court';
 import { LF_SPOT } from '@/components/shooting/constants';
-import { Undo2, X, Trophy, ChevronDown } from 'lucide-react';
+import { Undo2, X, Trophy, ChevronDown, CloudOff, RefreshCw } from 'lucide-react';
 import { useMediaQuery } from '@/lib/useMediaQuery';
+import { useWakeLock } from '@/lib/useWakeLock';
+import {
+  enqueueSpotOp,
+  startSpotQueue,
+  usePendingSpotCount,
+  useIsOnline,
+} from '@/lib/spotQueue';
+import { GROUP_LABELS, groupKeysOf, groupOf } from '@/lib/groups';
 import type { AnySpot, SpotScore } from '@/components/shooting/types';
 
 interface Player {
@@ -16,11 +24,22 @@ interface Player {
   avatar: string;
 }
 
+interface SavedSpotResult {
+  spotNum: number;
+  makes: number;
+  ftMakes: number;
+  points: number;
+}
+
 interface SessionPlayer {
   id: string;
   playerId: string;
   player: Player;
   totalPoints: number;
+  group: string | null;
+  shootOrder: number;
+  /** Spots déjà enregistrés, pour reprendre une session interrompue. */
+  spotResults?: SavedSpotResult[];
 }
 
 interface Spot {
@@ -44,11 +63,25 @@ interface Session {
   sessionPlayers: SessionPlayer[];
 }
 
-interface HistoryEntry {
+/**
+ * État de saisie d'un groupe de tir.
+ *
+ * Les groupes tournent sur des paniers différents et n'avancent pas au même
+ * rythme : chacun garde donc son propre spot, son joueur courant et sa saisie
+ * en attente. Un seul curseur global imposait un ordre de passage que le
+ * terrain ne respecte jamais dès qu'il y a plus d'un panier.
+ */
+interface GroupState {
+  /** Spot en cours. Égal au nombre de spots = groupe terminé. */
   spotIndex: number;
+  /** Index dans l'ordre de passage du groupe. */
   playerIndex: number;
-  mode: 'shooting' | 'validating';
-  currentMakes: number | null;
+  /** Paniers saisis, en attente des lancers francs. `null` = rien en cours. */
+  pendingMakes: number | null;
+}
+
+interface HistoryEntry extends GroupState {
+  group: string;
   savedScore?: {
     sessionPlayerId: string;
     spotId: string;
@@ -72,14 +105,16 @@ export default function SessionPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [currentSpotIndex, setCurrentSpotIndex] = useState(0);
-  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
-  const [mode, setMode] = useState<'shooting' | 'validating'>('shooting');
-  const [currentMakes, setCurrentMakes] = useState<number | null>(null);
+  // Un état de saisie par groupe, et l'onglet actuellement affiché.
+  const [groupStates, setGroupStates] = useState<Record<string, GroupState>>({});
+  const [activeGroup, setActiveGroup] = useState<string>(GROUP_LABELS[0]);
 
   const [scores, setScores] = useState<Record<string, Record<string, SpotScore>>>({});
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  // Classement affiché : le groupe courant seul, ou toute la session.
+  const [rankingScope, setRankingScope] = useState<'group' | 'all'>('all');
 
   // Modal de confirmation pour quitter
   const [showQuitModal, setShowQuitModal] = useState(false);
@@ -88,11 +123,17 @@ export default function SessionPage() {
 
   const allowLeaveRef = useRef(false);
   /*
-    Verrou de saisie. `mode` ne repasse à 'shooting' qu'après le rendu suivant :
-    deux appuis rapprochés sur le pavé des lancers francs passaient tous deux
-    la garde et enregistraient le spot deux fois. Une ref change tout de suite.
+    Verrou de saisie. L'état ne repasse à 'shooting' qu'au rendu suivant : deux
+    appuis rapprochés sur le pavé des lancers francs passaient tous deux la
+    garde et enregistraient le spot deux fois. On retient donc la saisie qu'on
+    vient de valider — groupe, spot, joueur — et on refuse la même.
+
+    Un jeton plutôt qu'un booléen relâché plus tard : il se périme tout seul au
+    passage au tireur suivant, sans minuteur. Un `requestAnimationFrame` ne
+    s'exécute pas dans un onglet en arrière-plan, et un verrou qui attend un
+    minuteur gelé fige toute la saisie.
   */
-  const submittingRef = useRef(false);
+  const submittedRef = useRef<string | null>(null);
 
   // Sur petit écran le terrain est réduit : on grossit les pastilles de spot
   const isMobile = useMediaQuery('(max-width: 880px)');
@@ -101,6 +142,31 @@ export default function SessionPage() {
   useEffect(() => {
     fetchSession();
   }, [sessionId]);
+
+  /**
+   * Position d'un groupe à la reprise.
+   *
+   * La rotation est connue : tout le groupe tire le spot 1, puis le spot 2, et
+   * ainsi de suite dans l'ordre de passage. On rend donc la première case
+   * vide de cette rotation. Un trou au milieu — un joueur arrivé en retard,
+   * une saisie annulée — fait reprendre sur ce trou, ce qui est le bon
+   * comportement : c'est bien ce tir-là qui manque.
+   */
+  const resumeCursor = (
+    groupPlayers: SessionPlayer[],
+    spots: Spot[]
+  ): GroupState => {
+    for (let spotIndex = 0; spotIndex < spots.length; spotIndex += 1) {
+      for (let playerIndex = 0; playerIndex < groupPlayers.length; playerIndex += 1) {
+        const saved = groupPlayers[playerIndex].spotResults ?? [];
+        const done = saved.some((r) => r.spotNum === spots[spotIndex].num);
+        if (!done) return { spotIndex, playerIndex, pendingMakes: null };
+      }
+    }
+
+    // Tous les spots du groupe sont remplis : groupe terminé.
+    return { spotIndex: spots.length, playerIndex: 0, pendingMakes: null };
+  };
 
   const fetchSession = async () => {
     try {
@@ -116,11 +182,54 @@ export default function SessionPage() {
 
       setSession(data);
 
+      const spots: Spot[] = data.court.spotsConfig;
+
+      /*
+        L'état de saisie est reconstruit depuis la base, pas remis à zéro : un
+        onglet fermé, un téléphone qui se verrouille ou un rechargement en
+        pleine séance ne doivent rien coûter. L'ordre de passage vient du
+        tirage au sort persisté à la création, donc la reprise respecte le
+        même ordre.
+      */
+      const keys = groupKeysOf(data.sessionPlayers);
+      const initialStates: Record<string, GroupState> = {};
+      keys.forEach((key) => {
+        const groupPlayers = (data.sessionPlayers as SessionPlayer[])
+          .filter((sp) => groupOf(sp) === key)
+          .sort((a, b) => a.shootOrder - b.shootOrder);
+        initialStates[key] = resumeCursor(groupPlayers, spots);
+      });
+      setGroupStates(initialStates);
+      setRankingScope(keys.length > 1 ? 'group' : 'all');
+
+      // On ouvre sur un groupe qui a encore des spots à tirer.
+      const firstOpen = keys.find((key) => initialStates[key].spotIndex < spots.length);
+      setActiveGroup(firstOpen ?? keys[0] ?? GROUP_LABELS[0]);
+
+      // Plus rien à saisir : la session est finie, on va droit aux résultats.
+      if (keys.length > 0 && !firstOpen) {
+        allowLeaveRef.current = true;
+        router.replace(`/session/${sessionId}/results`);
+        return;
+      }
+
+      const spotByNum = new Map(spots.map((spot) => [spot.num, spot]));
       const initialScores: Record<string, Record<string, SpotScore>> = {};
       data.sessionPlayers.forEach((sp: SessionPlayer) => {
         initialScores[sp.id] = {};
-        data.court.spotsConfig.forEach((spot: Spot) => {
+        spots.forEach((spot: Spot) => {
           initialScores[sp.id][spot.id] = { makes: null, ftMakes: null, points: 0 };
+        });
+
+        // Les spots déjà saisis réapparaissent sur le terrain et dans les totaux.
+        (sp.spotResults ?? []).forEach((result) => {
+          const spot = spotByNum.get(result.spotNum);
+          if (!spot) return;
+          initialScores[sp.id][spot.id] = {
+            makes: result.makes,
+            ftMakes: result.ftMakes,
+            points: result.points,
+          };
         });
       });
       setScores(initialScores);
@@ -196,14 +305,66 @@ export default function SessionPage() {
     };
   }, [session]);
 
+  const spotCount = session?.court.spotsConfig.length ?? 0;
+
+  /** Groupes de la session, dans l'ordre des étiquettes. */
+  const groupKeys = useMemo(
+    () => (session ? groupKeysOf(session.sessionPlayers) : []),
+    [session]
+  );
+
+  /** Joueurs de chaque groupe, dans leur ordre de passage. */
+  const playersByGroup = useMemo(() => {
+    const map: Record<string, SessionPlayer[]> = {};
+    if (!session) return map;
+
+    groupKeys.forEach((key) => { map[key] = []; });
+    session.sessionPlayers.forEach((sp) => {
+      const key = groupOf(sp);
+      (map[key] = map[key] ?? []).push(sp);
+    });
+    // L'API trie déjà, mais la rotation ne doit pas en dépendre.
+    Object.values(map).forEach((list) => list.sort((a, b) => a.shootOrder - b.shootOrder));
+
+    return map;
+  }, [session, groupKeys]);
+
+  const isGroupFinished = useCallback(
+    (state: GroupState | undefined) => !!state && spotCount > 0 && state.spotIndex >= spotCount,
+    [spotCount]
+  );
+
+  const activeState = groupStates[activeGroup];
+  const activeGroupPlayers = useMemo(
+    () => playersByGroup[activeGroup] ?? [],
+    [playersByGroup, activeGroup]
+  );
+  const mode: 'shooting' | 'validating' =
+    activeState?.pendingMakes === null || activeState === undefined ? 'shooting' : 'validating';
+
   const handleUndo = useCallback(() => {
     const last = history[history.length - 1];
     if (!last) return;
 
-    setCurrentSpotIndex(last.spotIndex);
-    setCurrentPlayerIndex(last.playerIndex);
-    setMode(last.mode);
-    setCurrentMakes(last.currentMakes);
+    /*
+      Une seule pile pour toute la session : « Retour » annule la dernière
+      saisie faite, quel que soit le groupe, et ramène l'onglet dessus. C'est
+      le seul comportement lisible quand trois paniers saisissent en alternance
+      sur le même téléphone.
+    */
+    // Le jeton vise la saisie qu'on vient de défaire : il doit redevenir
+    // valide, sinon ressaisir ce même tir serait refusé.
+    submittedRef.current = null;
+
+    setActiveGroup(last.group);
+    setGroupStates((prev) => ({
+      ...prev,
+      [last.group]: {
+        spotIndex: last.spotIndex,
+        playerIndex: last.playerIndex,
+        pendingMakes: last.pendingMakes,
+      },
+    }));
 
     if (last.savedScore) {
       const { sessionPlayerId, spotId, spotNum, previous } = last.savedScore;
@@ -220,32 +381,26 @@ export default function SessionPage() {
         Le serveur garde aussi une trace du spot : sans ça, la ligne survivait
         au retour arrière et la ressaisie en créait une seconde. On supprime,
         ou on réécrit la valeur d'avant si le spot avait déjà été rempli.
-      */
-      const url = `/api/sessions/${sessionId}/spot-result`;
-      const undoRequest =
-        previous.makes === null
-          ? fetch(url, {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sessionPlayerId, spotNum }),
-            })
-          : fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionPlayerId,
-                spotNum,
-                spotLabel: session?.court.spotsConfig[last.spotIndex]?.label ?? '',
-                spotSub: session?.court.spotsConfig[last.spotIndex]?.sub ?? '',
-                makes: previous.makes,
-                ftMakes: previous.ftMakes,
-                points: previous.points,
-              }),
-            });
 
-      undoRequest.catch((error) => {
-        console.error('Erreur annulation spot result:', error);
-      });
+        Comme la saisie, l'annulation part dans la file : hors réseau elle
+        attend son tour, et elle remplace l'enregistrement du même spot qui n'a
+        peut-être pas encore été envoyé.
+      */
+      if (previous.makes === null) {
+        enqueueSpotOp({ kind: 'delete', sessionId, sessionPlayerId, spotNum });
+      } else {
+        enqueueSpotOp({
+          kind: 'save',
+          sessionId,
+          sessionPlayerId,
+          spotNum,
+          spotLabel: session?.court.spotsConfig[last.spotIndex]?.label ?? '',
+          spotSub: session?.court.spotsConfig[last.spotIndex]?.sub ?? '',
+          makes: previous.makes,
+          ftMakes: previous.ftMakes ?? 0,
+          points: previous.points,
+        });
+      }
     }
 
     setHistory((prev) => prev.slice(0, -1));
@@ -257,38 +412,55 @@ export default function SessionPage() {
   };
 
   const handleMakes = useCallback((makes: number) => {
-    if (!session || mode !== 'shooting') return;
+    if (!session) return;
+
+    const state = groupStates[activeGroup];
+    if (!state || state.pendingMakes !== null) return;
+    // Groupe arrivé au bout de ses spots : plus rien à saisir.
+    if (state.spotIndex >= session.court.spotsConfig.length) return;
 
     setHistory((prev) => [...prev, {
-      spotIndex: currentSpotIndex,
-      playerIndex: currentPlayerIndex,
-      mode: 'shooting',
-      currentMakes: null,
+      group: activeGroup,
+      spotIndex: state.spotIndex,
+      playerIndex: state.playerIndex,
+      pendingMakes: null,
       savedScore: null,
     }]);
 
-    setCurrentMakes(makes);
-    setMode('validating');
-  }, [session, mode, currentSpotIndex, currentPlayerIndex]);
+    setGroupStates((prev) => ({
+      ...prev,
+      [activeGroup]: { ...state, pendingMakes: makes },
+    }));
+  }, [session, groupStates, activeGroup]);
 
   const handleFt = useCallback((ftMakes: number) => {
-    if (!session || mode !== 'validating' || currentMakes === null) return;
-    // Deuxième appui pendant que le premier part : on l'ignore.
-    if (submittingRef.current) return;
-    submittingRef.current = true;
+    if (!session) return;
 
-    const currentSessionPlayer = session.sessionPlayers[currentPlayerIndex];
-    const currentSpot = session.court.spotsConfig[currentSpotIndex];
+    const state = groupStates[activeGroup];
+    if (!state || state.pendingMakes === null) return;
+
+    // Deuxième appui pendant que le premier est traité : même jeton, on ignore.
+    const token = `${activeGroup}:${state.spotIndex}:${state.playerIndex}`;
+    if (submittedRef.current === token) return;
+
+    const groupPlayers = playersByGroup[activeGroup] ?? [];
+    const currentSessionPlayer = groupPlayers[state.playerIndex];
+    const currentSpot = session.court.spotsConfig[state.spotIndex];
+    if (!currentSessionPlayer || !currentSpot) return;
+
+    submittedRef.current = token;
+
+    const currentMakes = state.pendingMakes;
     const points = currentMakes * ftMakes;
 
     const previousScore = scores[currentSessionPlayer.id]?.[currentSpot.id]
       || { makes: null, ftMakes: null, points: 0 };
 
     setHistory((prev) => [...prev, {
-      spotIndex: currentSpotIndex,
-      playerIndex: currentPlayerIndex,
-      mode: 'validating',
-      currentMakes,
+      group: activeGroup,
+      spotIndex: state.spotIndex,
+      playerIndex: state.playerIndex,
+      pendingMakes: currentMakes,
       savedScore: {
         sessionPlayerId: currentSessionPlayer.id,
         spotId: currentSpot.id,
@@ -306,51 +478,79 @@ export default function SessionPage() {
     }));
 
     /*
-      On avance avant d'attendre le réseau : la saisie suivante ne doit pas
-      dépendre de la latence, et l'écran reste réactif sur un terrain mal
-      couvert. L'enregistrement est idempotent côté serveur.
+      La saisie part dans la file, qui l'envoie tout de suite si le réseau
+      répond et la garde sinon. L'écran n'attend jamais : sur un terrain mal
+      couvert, le joueur suivant doit pouvoir saisir dans la foulée.
     */
-    fetch(`/api/sessions/${sessionId}/spot-result`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionPlayerId: currentSessionPlayer.id,
-        spotNum: currentSpot.num,
-        spotLabel: currentSpot.label,
-        spotSub: currentSpot.sub,
-        makes: currentMakes,
-        ftMakes,
-        points,
-      }),
-    })
-      .catch((error) => {
-        console.error('Erreur sauvegarde spot result:', error);
-      })
-      .finally(() => {
-        submittingRef.current = false;
-      });
+    enqueueSpotOp({
+      kind: 'save',
+      sessionId,
+      sessionPlayerId: currentSessionPlayer.id,
+      spotNum: currentSpot.num,
+      spotLabel: currentSpot.label,
+      spotSub: currentSpot.sub,
+      makes: currentMakes,
+      ftMakes,
+      points,
+    });
 
-    const nextPlayerIndex = currentPlayerIndex + 1;
+    /*
+      Avancement du seul groupe actif : joueur suivant dans l'ordre de passage,
+      puis spot suivant quand tout le groupe a tiré. Les autres groupes gardent
+      leur position.
+    */
+    const nextPlayerIndex = state.playerIndex + 1;
+    const advanced: GroupState =
+      nextPlayerIndex >= groupPlayers.length
+        ? { spotIndex: state.spotIndex + 1, playerIndex: 0, pendingMakes: null }
+        : { spotIndex: state.spotIndex, playerIndex: nextPlayerIndex, pendingMakes: null };
 
-    if (nextPlayerIndex >= session.sessionPlayers.length) {
-      const nextSpotIndex = currentSpotIndex + 1;
+    const nextStates = { ...groupStates, [activeGroup]: advanced };
+    setGroupStates(nextStates);
 
-      if (nextSpotIndex >= session.court.spotsConfig.length) {
-        // Fin de session : on autorise la navigation
-        allowLeaveRef.current = true;
-        router.push(`/session/${sessionId}/results`);
-        return;
-      }
+    const total = session.court.spotsConfig.length;
+    const finished = (key: string) => (nextStates[key]?.spotIndex ?? 0) >= total;
 
-      setCurrentSpotIndex(nextSpotIndex);
-      setCurrentPlayerIndex(0);
-    } else {
-      setCurrentPlayerIndex(nextPlayerIndex);
+    // La session ne se termine que quand tous les paniers ont fini leurs spots.
+    if (groupKeys.every(finished)) {
+      allowLeaveRef.current = true;
+      router.push(`/session/${sessionId}/results`);
+      return;
     }
 
-    setCurrentMakes(null);
-    setMode('shooting');
-  }, [session, mode, currentMakes, currentPlayerIndex, currentSpotIndex, sessionId, router, scores]);
+    // Ce groupe a fini : on bascule sur un panier encore en cours plutôt que
+    // de laisser un écran de saisie inerte à l'appareil posé sur le terrain.
+    if (finished(activeGroup)) {
+      const nextGroup = groupKeys.find((key) => !finished(key));
+      if (nextGroup) setActiveGroup(nextGroup);
+    }
+  }, [session, groupStates, activeGroup, playersByGroup, groupKeys, sessionId, router, scores]);
+
+  /*
+    Bascule d'onglet. Un groupe terminé n'est pas sélectionnable : son écran de
+    saisie n'aurait plus de tireur, et son score reste consultable dans le
+    classement.
+  */
+  const handleSelectGroup = useCallback((key: string) => {
+    if (isGroupFinished(groupStates[key])) return;
+    setActiveGroup(key);
+  }, [groupStates, isGroupFinished]);
+
+  /*
+    L'écran reste allumé tant que la session tourne : le téléphone est posé au
+    milieu du terrain et les joueurs viennent saisir entre deux spots.
+  */
+  useWakeLock(!!session);
+
+  /*
+    La file est rejouée au retour du réseau et quand l'onglet repasse au
+    premier plan — y compris les saisies d'une visite précédente, qu'un
+    rechargement aurait sinon laissées en plan.
+  */
+  useEffect(() => startSpotQueue(), []);
+
+  const pendingSaves = usePendingSpotCount();
+  const isOnline = useIsOnline();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -380,6 +580,23 @@ export default function SessionPage() {
         return;
       }
 
+      // Flèches : passer d'un groupe à l'autre au clavier.
+      if (k === 'ArrowLeft' || k === 'ArrowRight') {
+        if (groupKeys.length < 2) return;
+        e.preventDefault();
+        const from = groupKeys.indexOf(activeGroup);
+        const step = k === 'ArrowRight' ? 1 : -1;
+        for (let i = 1; i <= groupKeys.length; i += 1) {
+          const index = (((from + step * i) % groupKeys.length) + groupKeys.length) % groupKeys.length;
+          const candidate = groupKeys[index];
+          if (!isGroupFinished(groupStates[candidate])) {
+            setActiveGroup(candidate);
+            return;
+          }
+        }
+        return;
+      }
+
       if (mode === 'shooting') {
         if (/^[0-9]$/.test(k)) { e.preventDefault(); handleMakes(parseInt(k, 10)); }
         else if (k === '+' || k === '=' || k === 't' || k === 'T') { e.preventDefault(); handleMakes(10); }
@@ -389,7 +606,8 @@ export default function SessionPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mode, handleMakes, handleFt, handleUndo, showRanking, showQuitModal]);
+  }, [mode, handleMakes, handleFt, handleUndo, showRanking, showQuitModal,
+      groupKeys, activeGroup, groupStates, isGroupFinished]);
 
   const spotsToRender = useMemo<AnySpot[]>(() => {
     if (!session) return [];
@@ -399,9 +617,9 @@ export default function SessionPage() {
 
   const renderStates = useMemo<Record<string, SpotScore | null>>(() => {
     if (!session) return {};
-    const currentSessionPlayer = session.sessionPlayers[currentPlayerIndex];
-    return scores[currentSessionPlayer.id] || {};
-  }, [session, scores, currentPlayerIndex]);
+    const shooter = activeGroupPlayers[activeState?.playerIndex ?? 0];
+    return (shooter && scores[shooter.id]) || {};
+  }, [session, scores, activeGroupPlayers, activeState]);
 
   const totals = useMemo<Record<string, number>>(() => {
     const out: Record<string, number> = {};
@@ -424,14 +642,32 @@ export default function SessionPage() {
 
   if (!session) return null;
 
-  const currentSessionPlayer = session.sessionPlayers[currentPlayerIndex];
+  /*
+    Replis volontaires. Un groupe terminé n'est pas sélectionnable et la session
+    part sur les résultats dès que tous les groupes ont fini : ces bornes ne
+    servent qu'à garantir qu'aucun rendu intermédiaire ne tombe sur `undefined`.
+  */
+  const currentSpotIndex = Math.min(activeState?.spotIndex ?? 0, Math.max(spotCount - 1, 0));
+  const currentPlayerIndex = activeState?.playerIndex ?? 0;
+  const currentMakes = activeState?.pendingMakes ?? null;
+
+  const currentSessionPlayer = activeGroupPlayers[currentPlayerIndex] ?? activeGroupPlayers[0];
   const currentSpot = session.court.spotsConfig[currentSpotIndex];
+  if (!currentSessionPlayer || !currentSpot) return null;
+
   const currentPlayer = currentSessionPlayer.player;
   const canUndo = history.length > 0;
   const currentTotal = totals[currentSessionPlayer.id] ?? 0;
   const initials = `${currentPlayer.firstName[0]}${currentPlayer.lastName[0]}`;
 
-  const rankedPlayers = [...session.sessionPlayers].sort(
+  const hasGroups = groupKeys.length > 1;
+
+  // Classement : le groupe affiché seul, ou toute la session.
+  const rankingPlayers = rankingScope === 'group' && hasGroups
+    ? activeGroupPlayers
+    : session.sessionPlayers;
+
+  const rankedPlayers = [...rankingPlayers].sort(
     (a, b) => (totals[b.id] ?? 0) - (totals[a.id] ?? 0)
   );
 
@@ -460,9 +696,10 @@ export default function SessionPage() {
               SESSION EN COURS
             </h1>
             <p className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-widest truncate">
-              Spot {currentSpotIndex + 1} / {session.court.spotsConfig.length}
+              {hasGroups && <>Groupe {activeGroup} · </>}
+              Spot {currentSpotIndex + 1} / {spotCount}
               <span className="mobile:hidden">
-                {' '}· Joueur {currentPlayerIndex + 1} / {session.sessionPlayers.length}
+                {' '}· Joueur {currentPlayerIndex + 1} / {activeGroupPlayers.length}
               </span>
             </p>
           </div>
@@ -494,6 +731,35 @@ export default function SessionPage() {
             <span>Score live</span>
           </button>
 
+          {/* État d'envoi.
+              Visible seulement quand il y a quelque chose à signaler : une
+              saisie pas encore confirmée, ou la connexion tombée. Tant que ce
+              badge est affiché, il ne faut pas fermer l'onglet. */}
+          {(!isOnline || pendingSaves > 0) && (
+            <div
+              className={`shrink-0 flex items-center gap-1.5 h-10 px-3 mobile:px-2 rounded-xl border text-xs font-bold ${
+                isOnline
+                  ? 'bg-[rgba(255,180,0,0.12)] border-[rgba(255,180,0,0.3)] text-[#FFB400]'
+                  : 'bg-[rgba(239,68,68,0.12)] border-[rgba(239,68,68,0.3)] text-red-400'
+              }`}
+              title={
+                isOnline
+                  ? `${pendingSaves} saisie(s) en cours d'envoi`
+                  : 'Hors ligne — les saisies sont gardées et envoyées au retour du réseau'
+              }
+            >
+              {isOnline ? (
+                <RefreshCw size={14} className="shrink-0 animate-spin" />
+              ) : (
+                <CloudOff size={14} className="shrink-0" />
+              )}
+              <span className="mobile:hidden">
+                {isOnline ? 'Envoi' : 'Hors ligne'}
+              </span>
+              {pendingSaves > 0 && <span className="font-mono">{pendingSaves}</span>}
+            </div>
+          )}
+
           {/* Annuler */}
           <button
             onClick={handleUndo}
@@ -509,6 +775,62 @@ export default function SessionPage() {
             <span>Retour</span>
           </button>
         </div>
+
+        {/* Onglets de groupe.
+            Un seul téléphone posé au milieu du terrain sert tous les paniers :
+            on tape l'onglet du groupe qui se présente, et sa rotation reprend
+            où elle s'était arrêtée. Masqués quand il n'y a qu'un groupe. */}
+        {hasGroups && (
+          <div className="mt-3 mobile:mt-1.5 short:mt-1 flex items-stretch gap-1.5 mobile:gap-1">
+            {groupKeys.map((key) => {
+              const state = groupStates[key];
+              const players = playersByGroup[key] ?? [];
+              const finished = isGroupFinished(state);
+              const shooter = players[state?.playerIndex ?? 0]?.player;
+              const isActive = key === activeGroup;
+
+              return (
+                <button
+                  key={key}
+                  onClick={() => handleSelectGroup(key)}
+                  disabled={finished}
+                  aria-current={isActive ? 'true' : undefined}
+                  className={`flex-1 min-w-0 flex items-center gap-2 mobile:gap-1.5 px-2.5 mobile:px-1.5 py-2 mobile:py-1.5 rounded-xl border transition-all ${
+                    isActive
+                      ? 'bg-[rgba(0,191,255,0.18)] border-[#00BFFF] shadow-[0_0_16px_rgba(0,191,255,0.25)]'
+                      : finished
+                      ? 'bg-[rgba(245,241,232,0.03)] border-[rgba(245,241,232,0.08)] cursor-default'
+                      : 'bg-[rgba(0,191,255,0.04)] border-[rgba(0,191,255,0.15)] active:scale-95'
+                  }`}
+                >
+                  <span
+                    className={`w-6 h-6 mobile:w-5 mobile:h-5 shrink-0 rounded-lg flex items-center justify-center text-xs mobile:text-[10px] font-extrabold ${
+                      isActive
+                        ? 'bg-[#00BFFF] text-[#0A1628]'
+                        : finished
+                        ? 'bg-[rgba(245,241,232,0.08)] text-[rgba(245,241,232,0.35)]'
+                        : 'bg-[rgba(0,191,255,0.15)] text-[#00BFFF]'
+                    }`}
+                  >
+                    {key}
+                  </span>
+                  <span className="min-w-0 flex-1 text-left leading-tight">
+                    <span
+                      className={`block text-xs mobile:text-[11px] font-bold truncate ${
+                        finished ? 'text-[rgba(245,241,232,0.35)]' : 'text-[#F5F1E8]'
+                      }`}
+                    >
+                      {finished ? 'Terminé' : shooter?.firstName ?? '—'}
+                    </span>
+                    <span className="block font-mono text-[9px] text-[rgba(245,241,232,0.4)] truncate mobile:hidden">
+                      {finished ? `${spotCount} spots` : `Spot ${(state?.spotIndex ?? 0) + 1}/${spotCount}`}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Avancement — segments proportionnels, lisibles à toutes les tailles */}
         <div className="mt-3 mobile:mt-1.5 short:mt-1 flex items-center gap-1.5 mobile:gap-[3px]">
@@ -652,25 +974,58 @@ export default function SessionPage() {
 
           {/* Classement — panneau permanent en desktop */}
           <div className="flex mobile:hidden shrink-0 max-h-[280px] rounded-2xl bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] p-5 flex-col">
-            <div className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em] mb-3 shrink-0">
-              Classement
+            <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+              <div className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase tracking-[0.2em]">
+                Classement
+              </div>
+              {hasGroups && (
+                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[rgba(0,191,255,0.06)] border border-[rgba(0,191,255,0.12)]">
+                  {([
+                    { key: 'group', label: `Groupe ${activeGroup}` },
+                    { key: 'all', label: 'Général' },
+                  ] as const).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setRankingScope(key)}
+                      className={`px-2.5 py-1 rounded-md font-mono text-[10px] uppercase tracking-wider transition-all ${
+                        rankingScope === key
+                          ? 'bg-[#00BFFF] text-[#0A1628] font-bold'
+                          : 'text-[rgba(245,241,232,0.5)] hover:text-[#F5F1E8]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="space-y-1.5 scroll-area pr-1">
-              {session.sessionPlayers.map((sp, idx) => (
-                <div
-                  key={sp.id}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
-                    idx === currentPlayerIndex
-                      ? 'bg-[rgba(0,191,255,0.15)] border border-[rgba(0,191,255,0.3)]'
-                      : 'bg-[rgba(0,191,255,0.02)] border border-transparent'
-                  }`}
-                >
-                  <span className={`text-sm font-bold truncate ${idx === currentPlayerIndex ? 'text-[#00BFFF]' : 'text-[rgba(245,241,232,0.7)]'}`}>
-                    {sp.player.firstName}
-                  </span>
-                  <span className="font-mono text-lg font-extrabold text-[#00BFFF] ml-2">{totals[sp.id] ?? 0}</span>
-                </div>
-              ))}
+              {rankedPlayers.map((sp, idx) => {
+                const isActive = sp.id === currentSessionPlayer.id;
+                return (
+                  <div
+                    key={sp.id}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                      isActive
+                        ? 'bg-[rgba(0,191,255,0.15)] border border-[rgba(0,191,255,0.3)]'
+                        : 'bg-[rgba(0,191,255,0.02)] border border-transparent'
+                    }`}
+                  >
+                    <span className="font-mono text-[11px] font-bold text-[rgba(245,241,232,0.3)] w-4 shrink-0">
+                      {idx + 1}
+                    </span>
+                    <span className={`flex-1 min-w-0 text-sm font-bold truncate ${isActive ? 'text-[#00BFFF]' : 'text-[rgba(245,241,232,0.7)]'}`}>
+                      {sp.player.firstName}
+                    </span>
+                    {hasGroups && rankingScope === 'all' && (
+                      <span className="font-mono text-[9px] text-[rgba(245,241,232,0.35)] shrink-0">
+                        {groupOf(sp)}
+                      </span>
+                    )}
+                    <span className="font-mono text-lg font-extrabold text-[#00BFFF] ml-1 shrink-0">{totals[sp.id] ?? 0}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -709,8 +1064,31 @@ export default function SessionPage() {
               </button>
             </div>
 
-            <div className="shrink-0 px-5 py-2 border-b border-[rgba(0,191,255,0.08)] font-mono text-[10px] uppercase tracking-[0.16em] text-[rgba(245,241,232,0.4)]">
-              Spot {currentSpotIndex + 1} / {session.court.spotsConfig.length}
+            <div className="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-[rgba(0,191,255,0.08)]">
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[rgba(245,241,232,0.4)] truncate">
+                {hasGroups && <>Groupe {activeGroup} · </>}
+                Spot {currentSpotIndex + 1} / {spotCount}
+              </span>
+              {hasGroups && (
+                <div className="flex items-center gap-1 p-0.5 shrink-0 rounded-lg bg-[rgba(0,191,255,0.06)] border border-[rgba(0,191,255,0.12)]">
+                  {([
+                    { key: 'group', label: `Groupe ${activeGroup}` },
+                    { key: 'all', label: 'Général' },
+                  ] as const).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setRankingScope(key)}
+                      className={`px-2.5 py-1 rounded-md font-mono text-[10px] uppercase tracking-wider transition-all active:scale-95 ${
+                        rankingScope === key
+                          ? 'bg-[#00BFFF] text-[#0A1628] font-bold'
+                          : 'text-[rgba(245,241,232,0.5)] '
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex-1 min-h-0 scroll-area px-4 py-3 space-y-2">
@@ -749,6 +1127,11 @@ export default function SessionPage() {
                     <span className={`flex-1 min-w-0 text-sm font-bold truncate ${isActive ? 'text-[#00BFFF]' : 'text-[#F5F1E8]'}`}>
                       {sp.player.firstName} {sp.player.lastName}
                     </span>
+                    {hasGroups && rankingScope === 'all' && (
+                      <span className="shrink-0 w-5 h-5 rounded-md bg-[rgba(0,191,255,0.12)] font-mono text-[9px] font-bold text-[#00BFFF] flex items-center justify-center">
+                        {groupOf(sp)}
+                      </span>
+                    )}
                     <span className="font-mono text-lg font-extrabold text-[#00BFFF] shrink-0">{totals[sp.id] ?? 0}</span>
                   </div>
                 );
@@ -772,7 +1155,7 @@ export default function SessionPage() {
                     Quitter la session ?
                   </h2>
                   <p className="text-sm mobile:text-xs text-[rgba(245,241,232,0.55)] mt-0.5">
-                    La progression sera perdue
+                    Vous pourrez la reprendre plus tard
                   </p>
                 </div>
               </div>
@@ -780,7 +1163,7 @@ export default function SessionPage() {
 
             <div className="scroll-area p-6 mobile:p-4">
               <p className="text-sm text-[#F5F1E8]">
-                Vous êtes sur le point de quitter la session en cours. Les scores enregistrés jusqu&apos;ici resteront sauvegardés, mais vous ne pourrez pas reprendre la session.
+                Vous êtes sur le point de quitter la session en cours. Tout ce qui a été saisi est sauvegardé : vous la retrouverez dans la liste des sessions, en cours, et elle reprendra exactement où vous l&apos;avez laissée.
               </p>
             </div>
 

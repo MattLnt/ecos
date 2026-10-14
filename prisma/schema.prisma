@@ -52,6 +52,17 @@ model SessionPlayer {
   player      Player   @relation(fields: [playerId], references: [id])
   totalPoints Int      @default(0)
   rank        Int?
+
+  // Groupe de tir ("A", "B", "C"…). Un entraînement à 11 joueurs se joue sur
+  // plusieurs paniers en parallèle : chaque groupe avance à son rythme dans les
+  // spots, mais tout le monde reste dans la même session, donc un seul
+  // classement général. `null` = sessions d'avant la répartition par groupes.
+  group       String?
+
+  // Ordre de passage dans le groupe, tiré au sort à la création. Il est
+  // persisté : un rechargement de la page ne doit pas rebattre les cartes au
+  // milieu de l'entraînement.
+  shootOrder  Int      @default(0)
   
   spotResults SpotResult[]
   
