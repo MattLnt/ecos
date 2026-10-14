@@ -1,5 +1,6 @@
 import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
+import { PlayerAvatar } from '@/components/PlayerAvatar';
 
 interface SessionCardProps {
   session: {
@@ -19,7 +20,6 @@ interface SessionCardProps {
 export function SessionCard({ session }: SessionCardProps) {
   const router = useRouter();
 
-  const initials = session.winner.name.slice(0, 2).toUpperCase();
 
   return (
     <button
@@ -60,16 +60,13 @@ export function SessionCard({ session }: SessionCardProps) {
               <div className="font-mono text-xs text-[rgba(245,241,232,0.4)] uppercase mb-1">Vainqueur</div>
               <div className="font-bold text-[#F5F1E8]">{session.winner.name}</div>
             </div>
-            {session.winner.photo ? (
-              <img src={session.winner.photo} alt="" className="w-12 h-12 rounded-full object-cover ring-2 ring-[#FFD700]" />
-            ) : (
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-[#0A1628] ring-2 ring-[#FFD700]"
-                style={{ backgroundColor: session.winner.avatar }}
-              >
-                {initials}
-              </div>
-            )}
+            <PlayerAvatar
+              photo={session.winner.photo}
+              avatar={session.winner.avatar}
+              firstName={session.winner.name}
+              className="w-12 h-12 text-xl"
+              ringClassName="ring-2 ring-[#FFD700]"
+            />
             <div className="text-left">
               <div className="font-mono text-2xl font-extrabold text-[#FFD700]">{session.winner.points}</div>
               <div className="font-mono text-xs text-[rgba(245,241,232,0.4)]">PTS</div>
@@ -82,16 +79,13 @@ export function SessionCard({ session }: SessionCardProps) {
         {/* Vainqueur — mobile */}
         <div className="hidden mobile:flex items-center gap-2 mt-3 pt-3 border-t border-[rgba(0,191,255,0.12)]">
           <span className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase shrink-0">Vainqueur</span>
-          {session.winner.photo ? (
-            <img src={session.winner.photo} alt="" className="w-7 h-7 rounded-full object-cover ring-2 ring-[#FFD700] shrink-0" />
-          ) : (
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-[#0A1628] ring-2 ring-[#FFD700] shrink-0"
-              style={{ backgroundColor: session.winner.avatar }}
-            >
-              {initials}
-            </div>
-          )}
+          <PlayerAvatar
+            photo={session.winner.photo}
+            avatar={session.winner.avatar}
+            firstName={session.winner.name}
+            className="w-7 h-7 text-sm"
+            ringClassName="ring-2 ring-[#FFD700]"
+          />
           <span className="font-bold text-sm text-[#F5F1E8] truncate flex-1 min-w-0">{session.winner.name}</span>
           <span className="font-mono text-lg font-extrabold text-[#FFD700] shrink-0">
             {session.winner.points}

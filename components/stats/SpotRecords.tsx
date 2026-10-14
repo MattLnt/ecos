@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Crown } from 'lucide-react';
+import { PlayerAvatar } from '@/components/PlayerAvatar';
 
 interface SpotRecord {
   spotNum: number;
@@ -23,6 +24,14 @@ interface SpotRecord {
 /** Le maximum atteignable sur un spot : dix paniers, deux lancers francs. */
 const MAX_SPOT_POINTS = 20;
 
+const PERIODS = [
+  { key: 'all', label: 'Depuis toujours' },
+  { key: '6m', label: '6 derniers mois' },
+  { key: '1m', label: 'Ce mois-ci' },
+] as const;
+
+type PeriodKey = (typeof PERIODS)[number]['key'];
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' });
 }
@@ -31,41 +40,87 @@ export function SpotRecords() {
   const router = useRouter();
   const [records, setRecords] = useState<SpotRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<PeriodKey>('all');
 
   useEffect(() => {
-    fetchRecords();
-  }, []);
+    /*
+      Le chargement vit dans l'effet : il dépend de la période, et une
+      fonction déclarée en dehors obligerait à la lister en dépendance pour
+      rien.
+    */
+    let cancelled = false;
 
-  const fetchRecords = async () => {
-    try {
-      const res = await fetch('/api/stats/spot-records');
-      const data = await res.json();
-      setRecords(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Erreur fetch spot records:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/stats/spot-records?period=${period}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setRecords(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Erreur fetch spot records:', error);
+      } finally {
+        // Deux changements de période rapprochés : seule la dernière réponse
+        // doit éteindre le chargement.
+        if (!cancelled) setLoading(false);
+      }
+    };
 
-  if (loading) {
-    return (
-      <div className="h-32 flex items-center justify-center">
-        <div className="text-[rgba(245,241,232,0.35)] text-sm">Chargement...</div>
-      </div>
-    );
-  }
+    load();
+    return () => { cancelled = true; };
+  }, [period]);
 
-  if (records.length === 0) return null;
+  const filters = (
+    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0">
+      {PERIODS.map(({ key, label }) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => setPeriod(key)}
+          className={`shrink-0 px-3 py-1.5 rounded-lg text-xs mobile:text-[11px] font-bold whitespace-nowrap transition-all active:scale-95 border ${
+            period === key
+              ? 'bg-[#00BFFF] text-[#0A1628] border-[#00BFFF]'
+              : 'bg-[rgba(0,191,255,0.06)] text-[rgba(245,241,232,0.65)] border-[rgba(0,191,255,0.15)] hover:bg-[rgba(0,191,255,0.12)]'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 
-  return (
-    <div className="space-y-3">
-      <div>
+  const header = (
+    <div className="flex items-end justify-between gap-3 mobile:flex-col mobile:items-stretch mobile:gap-2">
+      <div className="min-w-0">
         <h2 className="text-2xl mobile:text-lg font-bold text-[#F5F1E8]">Meilleurs scores par spot</h2>
         <p className="text-sm mobile:text-xs text-[rgba(245,241,232,0.5)] mt-1 mobile:mt-0.5">
           Le record de chaque position, et son détenteur
         </p>
       </div>
+      {filters}
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {header}
+        <div className="h-32 flex items-center justify-center">
+          <div className="text-[rgba(245,241,232,0.35)] text-sm">Chargement...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {header}
+
+      {records.length === 0 && (
+        <div className="rounded-xl border border-[rgba(0,191,255,0.15)] bg-[rgba(0,191,255,0.04)] p-8 text-center text-sm text-[rgba(245,241,232,0.45)]">
+          Aucune session sur cette période.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mobile:gap-2">
         {records.map((record) => {
@@ -119,16 +174,13 @@ export function SpotRecords() {
 
               {/* Détenteur */}
               <div className="flex items-center gap-2 mt-2.5">
-                {record.photo ? (
-                  <img src={record.photo} alt="" className="w-7 h-7 shrink-0 rounded-full object-cover" />
-                ) : (
-                  <div
-                    className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold text-[#0A1628]"
-                    style={{ backgroundColor: record.avatar }}
-                  >
-                    {record.firstName[0]}{record.lastName[0]}
-                  </div>
-                )}
+                <PlayerAvatar
+                  photo={record.photo}
+                  avatar={record.avatar}
+                  firstName={record.firstName}
+                  lastName={record.lastName}
+                  className="w-7 h-7 text-sm"
+                />
                 <div className="min-w-0">
                   <div className="text-xs font-bold text-[#F5F1E8] truncate leading-tight">
                     {record.firstName}

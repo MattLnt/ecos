@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { useRouter } from 'next/navigation';
 import { Calendar, Users, ChevronRight, Filter, Trash2, X } from 'lucide-react';
 
@@ -275,20 +276,14 @@ export default function SessionsPage() {
                             </div>
                             <div className="font-bold text-[#F5F1E8]">{winner.player.firstName}</div>
                           </div>
-                          {winner.player.photo ? (
-                            <img
-                              src={winner.player.photo}
-                              alt=""
-                              className="w-12 h-12 rounded-full object-cover ring-2 ring-[#FFD700]"
-                            />
-                          ) : (
-                            <div
-                              className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-[#0A1628] ring-2 ring-[#FFD700]"
-                              style={{ backgroundColor: winner.player.avatar }}
-                            >
-                              {winner.player.firstName[0]}{winner.player.lastName[0]}
-                            </div>
-                          )}
+                          <PlayerAvatar
+                            photo={winner.player.photo}
+                            avatar={winner.player.avatar}
+                            firstName={winner.player.firstName}
+                            lastName={winner.player.lastName}
+                            className="w-12 h-12 text-xl"
+                            ringClassName="ring-2 ring-[#FFD700]"
+                          />
                           <div className="text-left">
                             <div className="font-mono text-2xl font-extrabold text-[#FFD700]">
                               {winner.totalPoints}
@@ -308,20 +303,14 @@ export default function SessionsPage() {
                       <span className="font-mono text-[10px] text-[rgba(245,241,232,0.4)] uppercase shrink-0">
                         Vainqueur
                       </span>
-                      {winner.player.photo ? (
-                        <img
-                          src={winner.player.photo}
-                          alt=""
-                          className="w-7 h-7 rounded-full object-cover ring-2 ring-[#FFD700] shrink-0"
-                        />
-                      ) : (
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-[#0A1628] ring-2 ring-[#FFD700] shrink-0"
-                          style={{ backgroundColor: winner.player.avatar }}
-                        >
-                          {winner.player.firstName[0]}{winner.player.lastName[0]}
-                        </div>
-                      )}
+                      <PlayerAvatar
+                        photo={winner.player.photo}
+                        avatar={winner.player.avatar}
+                        firstName={winner.player.firstName}
+                        lastName={winner.player.lastName}
+                        className="w-7 h-7 text-sm"
+                        ringClassName="ring-2 ring-[#FFD700]"
+                      />
                       <span className="font-bold text-sm text-[#F5F1E8] truncate flex-1 min-w-0">
                         {winner.player.firstName}
                       </span>

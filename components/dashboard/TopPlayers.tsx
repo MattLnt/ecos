@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Trophy } from 'lucide-react';
+import { PlayerAvatar } from '@/components/PlayerAvatar';
 
 export interface TopPlayer {
   playerId: string;
@@ -72,16 +73,12 @@ export function TopPlayers({ players, minSessions, qualified }: TopPlayersProps)
                   {index + 1}
                 </span>
 
-                {player.photo ? (
-                  <img src={player.photo} alt="" className="w-9 h-9 mobile:w-8 mobile:h-8 rounded-full object-cover shrink-0" />
-                ) : (
-                  <div
-                    className="w-9 h-9 mobile:w-8 mobile:h-8 rounded-full flex items-center justify-center text-xs font-bold text-[#0A1628] shrink-0"
-                    style={{ backgroundColor: player.avatar }}
-                  >
-                    {player.name.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
+                <PlayerAvatar
+                  photo={player.photo}
+                  avatar={player.avatar}
+                  firstName={player.name}
+                  className="w-9 h-9 mobile:w-8 mobile:h-8 text-base"
+                />
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between gap-2">

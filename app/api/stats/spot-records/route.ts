@@ -9,6 +9,13 @@ import { prisma } from '@/lib/prisma';
  * bien le record du jeu tel qu'il se joue.
  */
 
+/** Fenêtres proposées. `all` depuis toujours. */
+const PERIODS: Record<string, number | null> = {
+  '1m': 1,
+  '6m': 6,
+  all: null,
+};
+
 interface SpotRecord {
   spotNum: number;
   spotLabel: string;
@@ -36,12 +43,25 @@ function isBetter(candidate: SpotRecord, current: SpotRecord): boolean {
   return candidate.date < current.date;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const period = searchParams.get('period') ?? 'all';
+    const months = PERIODS[period] ?? null;
+
+    let since: Date | undefined;
+    if (months !== null) {
+      const now = new Date();
+      since = new Date(now.getFullYear(), now.getMonth() - months, now.getDate());
+    }
+
     const spotResults = await prisma.spotResult.findMany({
       where: {
         sessionPlayer: {
-          session: { status: 'completed' },
+          session: {
+            status: 'completed',
+            ...(since ? { date: { gte: since } } : {}),
+          },
         },
       },
       include: {

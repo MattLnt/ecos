@@ -19,6 +19,7 @@ import { ShootingCard } from '@/components/dashboard/ShootingCard';
 import { TopPlayers, type TopPlayer } from '@/components/dashboard/TopPlayers';
 import { SessionCard } from '@/components/dashboard/SessionCard';
 import { ScoreEvolutionChart } from '@/components/dashboard/ScoreEvolutionChart';
+import { PlayerAvatar } from '@/components/PlayerAvatar';
 
 interface Rate {
   makes: number;
@@ -174,34 +175,10 @@ export default function HomePage() {
       </div>
 
       {/* ===== L'ADRESSE DU CLUB ===== */}
-      <div className="grid grid-cols-3 gap-4 mobile:gap-2.5">
-        <ShootingCard
-          icon={Target}
-          label="Mid-range"
-          rate={stats.shooting.mid.rate}
-          makes={stats.shooting.mid.makes}
-          attempts={stats.shooting.mid.attempts}
-          color="#00BFFF"
-          unit="tirs"
-        />
-        <ShootingCard
-          icon={Zap}
-          label="3 points"
-          rate={stats.shooting.three.rate}
-          makes={stats.shooting.three.makes}
-          attempts={stats.shooting.three.attempts}
-          color="#FFD700"
-          unit="tirs"
-        />
-        <ShootingCard
-          icon={Crosshair}
-          label="Lancers francs"
-          rate={stats.shooting.ft.rate}
-          makes={stats.shooting.ft.makes}
-          attempts={stats.shooting.ft.attempts}
-          color="#22C55E"
-          unit="LF"
-        />
+      <div className="grid grid-cols-3 gap-4 mobile:gap-2">
+        <ShootingCard icon={Target} label="Mid-range" rate={stats.shooting.mid.rate} color="#00BFFF" />
+        <ShootingCard icon={Zap} label="3 points" rate={stats.shooting.three.rate} color="#FFD700" />
+        <ShootingCard icon={Crosshair} label="Lancers francs" rate={stats.shooting.ft.rate} color="#22C55E" />
       </div>
 
       {/* ===== RECORD DU CLUB ===== */}
@@ -231,16 +208,14 @@ export default function HomePage() {
             </div>
           </div>
 
-          {best.photo ? (
-            <img src={best.photo} alt="" className="w-10 h-10 mobile:w-8 mobile:h-8 rounded-full object-cover shrink-0 ring-2 ring-[rgba(255,215,0,0.5)]" />
-          ) : (
-            <div
-              className="w-10 h-10 mobile:w-8 mobile:h-8 rounded-full flex items-center justify-center text-xs font-bold text-[#0A1628] shrink-0 ring-2 ring-[rgba(255,215,0,0.5)]"
-              style={{ backgroundColor: best.avatar }}
-            >
-              {best.firstName[0]}{best.lastName[0]}
-            </div>
-          )}
+          <PlayerAvatar
+            photo={best.photo}
+            avatar={best.avatar}
+            firstName={best.firstName}
+            lastName={best.lastName}
+            className="w-10 h-10 mobile:w-8 mobile:h-8 text-base"
+            ringClassName="ring-2 ring-[rgba(255,215,0,0.5)]"
+          />
 
           <div className="shrink-0 text-right">
             <div className="font-mono text-3xl mobile:text-2xl font-extrabold text-[#FFD700] leading-none">

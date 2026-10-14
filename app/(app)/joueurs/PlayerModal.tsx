@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, ChevronDown } from 'lucide-react';
 import ImageUpload from '@/components/ui/ImageUpload';
+import CustomSelect from './CustomSelect';
 
 interface Player {
   id: string;
@@ -54,7 +55,16 @@ const NBA_TEAMS = [
   { code: 'WAS', name: 'Washington Wizards', logo: 'https://cdn.nba.com/logos/nba/1610612764/global/L/logo.svg' },
 ];
 
-const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
+
+/** Le poste en toutes lettres : « SF » ne parle qu'aux initiés. */
+const POSITION_LABELS: Record<(typeof POSITIONS)[number], string> = {
+  PG: 'PG · Meneur',
+  SG: 'SG · Arrière',
+  SF: 'SF · Ailier',
+  PF: 'PF · Ailier fort',
+  C: 'C · Pivot',
+};
 
 const AVATAR_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
@@ -218,16 +228,16 @@ export default function PlayerModal({ player, onClose }: PlayerModalProps) {
               <label className="block text-sm font-medium text-[rgba(245,241,232,0.7)] mb-2">
                 Position
               </label>
-              <select
+              {/*
+                Le menu natif ouvrait la roulette grise du système, étrangère au
+                reste du formulaire. Le composant maison est déjà utilisé
+                ailleurs dans l'écran.
+              */}
+              <CustomSelect
                 value={formData.position}
-                onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                className="w-full px-4 py-2.5 bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] rounded-xl text-[#F5F1E8] focus:outline-none focus:border-[#00BFFF] transition-all"
-              >
-                <option value="" className="bg-[#0A1628]">Sélectionner</option>
-                {POSITIONS.map((pos) => (
-                  <option key={pos} value={pos} className="bg-[#0A1628]">{pos}</option>
-                ))}
-              </select>
+                onChange={(value) => setFormData({ ...formData, position: value })}
+                options={POSITIONS.map((pos) => ({ value: pos, label: POSITION_LABELS[pos] }))}
+              />
             </div>
           </div>
 
