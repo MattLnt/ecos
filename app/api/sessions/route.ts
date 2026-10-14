@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { activeMinutesBySession } from '@/lib/sessionDuration';
 
 export async function GET() {
   try {
@@ -20,7 +21,19 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json(sessions);
+    /*
+      La durée affichée vient des saisies, pas de `endedAt - startedAt` : une
+      session reprise le lendemain afficherait sinon une séance de vingt
+      heures.
+    */
+    const minutes = await activeMinutesBySession();
+
+    return NextResponse.json(
+      sessions.map((session) => ({
+        ...session,
+        activeMinutes: minutes.get(session.id) ?? 0,
+      }))
+    );
   } catch (error) {
     console.error('Erreur GET sessions:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

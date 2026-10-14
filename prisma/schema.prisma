@@ -81,6 +81,14 @@ model SpotResult {
   points          Int           // makes * ftMakes
   createdAt       DateTime      @default(now())
 
+  // Heure réelle de la saisie sur le terrain, envoyée par l'appareil.
+  //
+  // `createdAt` est l'heure d'arrivée au serveur : depuis que les saisies
+  // passent par une file rejouée au retour du réseau, les deux peuvent être
+  // très éloignées, et une séance saisie hors ligne puis envoyée d'un coup
+  // paraîtrait avoir duré quelques secondes.
+  recordedAt      DateTime      @default(now())
+
   // Un spot n'est tiré qu'une fois par joueur et par session. Sans cette
   // contrainte, un double appui ou un retour arrière créait une seconde ligne
   // et les stats cumulaient les deux (« 10/20 tirs »).

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { activeMinutesBySession } from '@/lib/sessionDuration';
 
 export async function GET() {
   try {
@@ -73,25 +74,26 @@ export async function GET() {
     });
     const lastMonthAvg = lastMonthAvgResult._avg.totalPoints || 0;
 
-    // Temps total (en minutes)
+    /*
+      Temps total (en minutes), mesuré sur les saisies de chaque session.
+
+      La soustraction `endedAt - startedAt` donnait des totaux absurdes :
+      `endedAt` était réécrit à chaque ouverture d'une page résultats, et une
+      session reprise le lendemain comptait la nuit entière.
+    */
     const completedSessions = await prisma.session.findMany({
       where: {
         status: 'completed',
         endedAt: { not: null },
       },
-      select: {
-        startedAt: true,
-        endedAt: true,
-      },
+      select: { id: true },
     });
 
-    const totalMinutes = completedSessions.reduce((sum, session) => {
-      if (!session.endedAt) return sum;
-      const duration = Math.floor(
-        (new Date(session.endedAt).getTime() - new Date(session.startedAt).getTime()) / 1000 / 60
-      );
-      return sum + duration;
-    }, 0);
+    const minutesBySession = await activeMinutesBySession();
+    const totalMinutes = completedSessions.reduce(
+      (sum, session) => sum + (minutesBySession.get(session.id) ?? 0),
+      0
+    );
 
     // Calcul des croissances
     const sessionsGrowth = lastMonthSessions > 0 

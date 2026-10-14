@@ -23,7 +23,15 @@ async function syncTotalPoints(sessionPlayerId: string) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { sessionPlayerId, spotNum, spotLabel, spotSub, makes, ftMakes, points } = body;
+    const { sessionPlayerId, spotNum, spotLabel, spotSub, makes, ftMakes, points, recordedAt } = body;
+
+    /*
+      L'appareil envoie l'heure du tir. Sans elle on retomberait sur l'heure
+      d'arrivée au serveur, qui peut arriver bien plus tard : les saisies
+      passent par une file rejouée au retour du réseau.
+    */
+    const recorded = recordedAt ? new Date(recordedAt) : new Date();
+    const recordedValid = !Number.isNaN(recorded.getTime()) ? recorded : new Date();
 
     /*
       Upsert et non create : un joueur ne tire qu'une fois chaque spot dans une
@@ -43,6 +51,7 @@ export async function POST(request: Request) {
         makes,
         ftMakes,
         points,
+        recordedAt: recordedValid,
       },
       update: {
         spotLabel,
@@ -50,6 +59,8 @@ export async function POST(request: Request) {
         makes,
         ftMakes,
         points,
+        // Une ressaisie remplace aussi l'horodatage : c'est ce tir-là qui compte.
+        recordedAt: recordedValid,
       },
     });
 

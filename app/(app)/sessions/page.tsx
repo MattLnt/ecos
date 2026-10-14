@@ -21,6 +21,8 @@ interface Session {
   date: string;
   startedAt: string;
   endedAt: string | null;
+  /** Durée réelle, mesurée du premier au dernier tir saisi. */
+  activeMinutes: number;
   status: string;
   court: {
     id: string;
@@ -86,12 +88,14 @@ export default function SessionsPage() {
     return [...session.sessionPlayers].sort((a, b) => b.totalPoints - a.totalPoints)[0];
   };
 
+  /*
+    La durée vient du serveur, qui la mesure sur les saisies. Le calcul
+    `endedAt - startedAt` qu'on faisait ici affichait des séances de plusieurs
+    jours : `endedAt` était réécrit à chaque ouverture de la page résultats.
+  */
   const getDuration = (session: Session) => {
-    if (!session.endedAt) return null;
-    const start = new Date(session.startedAt);
-    const end = new Date(session.endedAt);
-    const minutes = Math.floor((end.getTime() - start.getTime()) / 1000 / 60);
-    return `${minutes} min`;
+    if (!session.endedAt || !session.activeMinutes) return null;
+    return `${session.activeMinutes} min`;
   };
 
   if (loading) {

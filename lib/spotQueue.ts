@@ -27,6 +27,9 @@ export interface SpotSaveOp {
   points: number;
 }
 
+/** Heure du tir, figée au dépôt et transmise telle quelle au serveur. */
+type Stamped = { recordedAt: string };
+
 export interface SpotDeleteOp {
   kind: 'delete';
   sessionId: string;
@@ -36,7 +39,7 @@ export interface SpotDeleteOp {
 
 export type SpotOp = SpotSaveOp | SpotDeleteOp;
 
-type Entry = SpotOp & { queuedAt: number; attempts: number };
+type Entry = SpotOp & Stamped & { queuedAt: number; attempts: number };
 
 const STORAGE_KEY = 'ecos:spot-queue:v1';
 
@@ -130,6 +133,7 @@ async function send(entry: Entry): Promise<Response> {
       makes: entry.makes,
       ftMakes: entry.ftMakes,
       points: entry.points,
+      recordedAt: entry.recordedAt,
     }),
   });
 }
@@ -203,8 +207,19 @@ export function enqueueSpotOp(op: SpotOp): void {
   load();
 
   const key = keyOf(op);
+  const now = new Date();
   queue = queue.filter((entry) => keyOf(entry) !== key);
-  queue.push({ ...op, queuedAt: Date.now(), attempts: 0 });
+  /*
+    L'heure est figée ici, au moment du tir, et non à l'envoi : hors réseau,
+    une séance entière pourrait partir d'un bloc une heure plus tard et
+    paraître avoir duré quelques secondes.
+  */
+  queue.push({
+    ...op,
+    recordedAt: now.toISOString(),
+    queuedAt: now.getTime(),
+    attempts: 0,
+  });
 
   persist();
   notify();
