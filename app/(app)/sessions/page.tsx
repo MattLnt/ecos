@@ -140,32 +140,47 @@ export default function SessionsPage() {
         </div>
       </div>
 
-      {/* Stats rapides */}
-      <div className="grid grid-cols-3 gap-4 mobile:gap-3">
-        <div className="bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] rounded-xl p-5 mobile:p-3">
-          <div className="font-mono text-xs text-[rgba(245,241,232,0.4)] uppercase tracking-wider mb-2 mobile:text-[10px] mobile:leading-tight">
-            Total Sessions
+      {/*
+        Stats rapides.
+
+        Le libellé était au-dessus du chiffre : « Terminées » passait sur deux
+        lignes en mobile et décalait les trois cartes les unes par rapport aux
+        autres. Le chiffre passe devant, le libellé tient sur une ligne sous
+        lui, et chaque état prend sa couleur.
+      */}
+      <div className="grid grid-cols-3 gap-3 mobile:gap-2">
+        {([
+          { label: 'Total', value: sessions.length, color: '#00BFFF' },
+          {
+            label: 'Terminées',
+            value: sessions.filter(s => s.status === 'completed').length,
+            color: '#22C55E',
+          },
+          {
+            label: 'En cours',
+            value: sessions.filter(s => s.status === 'active').length,
+            color: '#FFB400',
+          },
+        ] as const).map(({ label, value, color }) => (
+          <div
+            key={label}
+            className="rounded-xl border p-4 mobile:p-3"
+            style={{
+              background: `linear-gradient(135deg, ${color}17 0%, ${color}07 100%)`,
+              borderColor: `${color}2e`,
+            }}
+          >
+            <div
+              className="font-mono text-3xl mobile:text-2xl font-extrabold leading-none"
+              style={{ color }}
+            >
+              {value}
+            </div>
+            <div className="text-xs mobile:text-[11px] text-[rgba(245,241,232,0.5)] uppercase tracking-wider mt-1.5 mobile:mt-1 truncate">
+              {label}
+            </div>
           </div>
-          <div className="font-mono text-3xl font-extrabold text-[#00BFFF] mobile:text-2xl">
-            {sessions.length}
-          </div>
-        </div>
-        <div className="bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] rounded-xl p-5 mobile:p-3">
-          <div className="font-mono text-xs text-[rgba(245,241,232,0.4)] uppercase tracking-wider mb-2 mobile:text-[10px] mobile:leading-tight">
-            Terminées
-          </div>
-          <div className="font-mono text-3xl font-extrabold text-[#00BFFF] mobile:text-2xl">
-            {sessions.filter(s => s.status === 'completed').length}
-          </div>
-        </div>
-        <div className="bg-[rgba(0,191,255,0.04)] border border-[rgba(0,191,255,0.15)] rounded-xl p-5 mobile:p-3">
-          <div className="font-mono text-xs text-[rgba(245,241,232,0.4)] uppercase tracking-wider mb-2 mobile:text-[10px] mobile:leading-tight">
-            En cours
-          </div>
-          <div className="font-mono text-3xl font-extrabold text-[#00BFFF] mobile:text-2xl">
-            {sessions.filter(s => s.status === 'active').length}
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Liste des sessions */}

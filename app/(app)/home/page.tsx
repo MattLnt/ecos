@@ -2,22 +2,50 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Target, Users, Trophy, Clock, ChevronRight, Plus } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  Calendar,
+  Users,
+  Trophy,
+  Clock,
+  ChevronRight,
+  Plus,
+  Target,
+  Zap,
+  Crosshair,
+  Crown,
+} from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
+import { ShootingCard } from '@/components/dashboard/ShootingCard';
+import { TopPlayers, type TopPlayer } from '@/components/dashboard/TopPlayers';
 import { SessionCard } from '@/components/dashboard/SessionCard';
 import { ScoreEvolutionChart } from '@/components/dashboard/ScoreEvolutionChart';
-import { useMediaQuery } from '@/lib/useMediaQuery';
+
+interface Rate {
+  makes: number;
+  attempts: number;
+  rate: number;
+}
 
 interface Stats {
   totalSessions: number;
+  sessionsThisMonth: number;
   activePlayers: number;
   avgPoints: number;
   totalMinutes: number;
-  growth: {
-    sessions: number;
-    players: number;
+  shooting: { mid: Rate; three: Rate; ft: Rate };
+  bestScore: {
     points: number;
+    firstName: string;
+    lastName: string;
+    photo: string | null;
+    avatar: string;
+    playerId: string;
+    date: string;
+  } | null;
+  growth: {
+    sessions: number | null;
+    players: number | null;
+    points: number | null;
   };
 }
 
@@ -34,24 +62,25 @@ interface RecentSession {
   };
 }
 
-interface TopPlayer {
-  name: string;
-  avgPoints: number;
-  sessionsCount: number;
-  avatar: string;
-  photo?: string | null;
+interface TopPlayersPayload {
+  minSessions: number;
+  qualified: boolean;
+  players: TopPlayer[];
+}
+
+/** « 14h 42m », ou « 42m » tant qu'on n'a pas une heure de jeu. */
+function formatPlayTime(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours > 0 ? `${hours}h ${rest}m` : `${rest}m`;
 }
 
 export default function HomePage() {
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([]);
-  const [topPlayers, setTopPlayers] = useState<TopPlayer[]>([]);
+  const [top, setTop] = useState<TopPlayersPayload>({ minSessions: 2, qualified: false, players: [] });
   const [loading, setLoading] = useState(true);
-
-  // Les graphiques Recharts ont besoin de valeurs numériques (hauteur, marges,
-  // taille des libellés), pas de classes CSS : on interroge donc la media query.
-  const isCompact = useMediaQuery('(max-width: 880px)');
 
   useEffect(() => {
     fetchDashboardData();
@@ -65,13 +94,9 @@ export default function HomePage() {
         fetch('/api/dashboard/top-players'),
       ]);
 
-      const statsData = await statsRes.json();
-      const sessionsData = await sessionsRes.json();
-      const playersData = await playersRes.json();
-
-      setStats(statsData);
-      setRecentSessions(sessionsData);
-      setTopPlayers(playersData);
+      setStats(await statsRes.json());
+      setRecentSessions(await sessionsRes.json());
+      setTop(await playersRes.json());
     } catch (error) {
       console.error('Erreur fetch dashboard:', error);
     } finally {
@@ -82,13 +107,17 @@ export default function HomePage() {
   if (loading || !stats) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-        <div className="text-[rgba(245,241,232,0.55)] font-mono text-sm">Chargement du tableau de bord...</div>
+        <div className="text-[rgba(245,241,232,0.55)] font-mono text-sm">
+          Chargement du tableau de bord...
+        </div>
       </div>
     );
   }
 
+  const best = stats.bestScore;
+
   return (
-    <div className="space-y-8 mobile:space-y-5">
+    <div className="space-y-6 mobile:space-y-4">
       {/* Header avec CTA */}
       <div className="flex items-center justify-between gap-4 mobile:flex-col mobile:items-stretch">
         <div>
@@ -99,7 +128,7 @@ export default function HomePage() {
             Vue d&apos;ensemble de vos performances
           </p>
         </div>
-        
+
         <button
           onClick={() => router.push('/session/new')}
           className="px-6 py-3 bg-gradient-to-r from-[#00BFFF] to-[#0088cc] text-[#0A1628] rounded-xl font-bold text-base flex items-center gap-2 hover:shadow-[0_8px_32px_rgba(0,191,255,0.4)] hover:scale-105 active:scale-95 transition-all mobile:w-full mobile:justify-center"
@@ -109,95 +138,133 @@ export default function HomePage() {
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-5 mobile:grid-cols-2 mobile:gap-3">
+      {/* ===== LES QUATRE REPÈRES ===== */}
+      <div className="grid grid-cols-4 gap-4 mobile:grid-cols-2 mobile:gap-2.5">
         <StatCard
-          icon={Target}
+          icon={Calendar}
           value={stats.totalSessions}
-          label="Sessions totales"
+          label="Sessions terminées"
+          color="#00BFFF"
           growth={stats.growth.sessions}
+          hint={`${stats.sessionsThisMonth} ce mois-ci`}
         />
         <StatCard
           icon={Users}
           value={stats.activePlayers}
           label="Joueurs actifs"
+          color="#A78BFA"
           growth={stats.growth.players}
+          hint="ce mois-ci"
         />
         <StatCard
           icon={Trophy}
           value={stats.avgPoints}
-          label="Points moyens"
+          label="Points par joueur"
+          color="#FFD700"
           growth={stats.growth.points}
+          hint="moyenne par session"
         />
         <StatCard
           icon={Clock}
-          value={`${Math.floor(stats.totalMinutes / 60)}h ${stats.totalMinutes % 60}m`}
+          value={formatPlayTime(stats.totalMinutes)}
           label="Temps de jeu"
+          color="#22C55E"
+          hint="toutes sessions"
         />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-[1.5fr_1fr] gap-6 mobile:grid-cols-1">
-        {/* Line Chart avec filtres */}
-        <ScoreEvolutionChart />
-
-        {/* Bar Chart - Top Players */}
-        <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-6 mobile:p-4 backdrop-blur-sm">
-          <div className="mb-6 mobile:mb-4">
-            <h2 className="text-lg font-bold text-[#F5F1E8]">Top 5 Joueurs</h2>
-            <p className="text-sm text-[rgba(245,241,232,0.55)] mt-1">Par moyenne de points</p>
-          </div>
-          <ResponsiveContainer width="100%" height={isCompact ? 220 : 280}>
-            <BarChart data={topPlayers} margin={{ top: 4, right: 4, left: isCompact ? -18 : 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,191,255,0.1)" />
-              <XAxis
-                dataKey="name"
-                stroke="rgba(245,241,232,0.35)"
-                interval={0}
-                tickMargin={6}
-                style={{ fontSize: isCompact ? '9px' : '12px' }}
-              />
-              <YAxis
-                stroke="rgba(245,241,232,0.35)"
-                width={isCompact ? 32 : 40}
-                style={{ fontSize: isCompact ? '10px' : '12px' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#0d1f38', 
-                  border: '1px solid rgba(0,191,255,0.2)',
-                  borderRadius: '12px',
-                  color: '#F5F1E8',
-                  padding: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
-                }}
-                labelStyle={{
-                  color: '#F5F1E8',
-                  fontWeight: 'bold',
-                  marginBottom: '4px'
-                }}
-                itemStyle={{
-                  color: '#00BFFF',
-                  fontWeight: '600'
-                }}
-                cursor={{ fill: 'rgba(0,191,255,0.05)' }}
-              />
-              <Bar 
-                dataKey="avgPoints" 
-                fill="#00BFFF"
-                radius={[8, 8, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      {/* ===== L'ADRESSE DU CLUB ===== */}
+      <div className="grid grid-cols-3 gap-4 mobile:gap-2.5">
+        <ShootingCard
+          icon={Target}
+          label="Mid-range"
+          rate={stats.shooting.mid.rate}
+          makes={stats.shooting.mid.makes}
+          attempts={stats.shooting.mid.attempts}
+          color="#00BFFF"
+          unit="tirs"
+        />
+        <ShootingCard
+          icon={Zap}
+          label="3 points"
+          rate={stats.shooting.three.rate}
+          makes={stats.shooting.three.makes}
+          attempts={stats.shooting.three.attempts}
+          color="#FFD700"
+          unit="tirs"
+        />
+        <ShootingCard
+          icon={Crosshair}
+          label="Lancers francs"
+          rate={stats.shooting.ft.rate}
+          makes={stats.shooting.ft.makes}
+          attempts={stats.shooting.ft.attempts}
+          color="#22C55E"
+          unit="LF"
+        />
       </div>
 
-      {/* Dernières Sessions */}
-      <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-6 mobile:p-4 backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-3 mb-6 mobile:mb-4">
+      {/* ===== RECORD DU CLUB ===== */}
+      {best && (
+        <button
+          type="button"
+          onClick={() => router.push(`/joueurs/${best.playerId}`)}
+          className="w-full text-left flex items-center gap-4 mobile:gap-3 rounded-2xl p-4 mobile:p-3 border border-[rgba(255,215,0,0.3)] bg-gradient-to-r from-[rgba(255,215,0,0.14)] via-[rgba(255,215,0,0.06)] to-transparent hover:border-[rgba(255,215,0,0.5)] active:scale-[0.995] transition-all"
+        >
+          <div className="w-11 h-11 mobile:w-9 mobile:h-9 shrink-0 rounded-xl bg-[rgba(255,215,0,0.18)] flex items-center justify-center">
+            <Crown size={20} className="text-[#FFD700] mobile:w-4 mobile:h-4" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[rgba(255,215,0,0.7)]">
+              Record du club
+            </div>
+            <div className="font-bold text-[#F5F1E8] mobile:text-sm truncate">
+              {best.firstName} {best.lastName}
+              <span className="text-[rgba(245,241,232,0.45)] font-normal">
+                {' '}· {new Date(best.date).toLocaleDateString('fr-FR', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </span>
+            </div>
+          </div>
+
+          {best.photo ? (
+            <img src={best.photo} alt="" className="w-10 h-10 mobile:w-8 mobile:h-8 rounded-full object-cover shrink-0 ring-2 ring-[rgba(255,215,0,0.5)]" />
+          ) : (
+            <div
+              className="w-10 h-10 mobile:w-8 mobile:h-8 rounded-full flex items-center justify-center text-xs font-bold text-[#0A1628] shrink-0 ring-2 ring-[rgba(255,215,0,0.5)]"
+              style={{ backgroundColor: best.avatar }}
+            >
+              {best.firstName[0]}{best.lastName[0]}
+            </div>
+          )}
+
+          <div className="shrink-0 text-right">
+            <div className="font-mono text-3xl mobile:text-2xl font-extrabold text-[#FFD700] leading-none">
+              {best.points}
+            </div>
+            <div className="font-mono text-[10px] text-[rgba(245,241,232,0.35)]">POINTS</div>
+          </div>
+        </button>
+      )}
+
+      {/* ===== ÉVOLUTION + TOP 5 ===== */}
+      <div className="grid grid-cols-[1.5fr_1fr] gap-4 mobile:grid-cols-1">
+        <ScoreEvolutionChart />
+        <TopPlayers players={top.players} minSessions={top.minSessions} qualified={top.qualified} />
+      </div>
+
+      {/* ===== DERNIÈRES SESSIONS ===== */}
+      <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-5 mobile:p-4 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-3 mb-4 mobile:mb-3">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-[#F5F1E8] truncate">Dernières Sessions</h2>
-            <p className="text-sm text-[rgba(245,241,232,0.55)] mt-1 mobile:text-xs">3 plus récentes</p>
+            <h2 className="text-lg mobile:text-base font-bold text-[#F5F1E8] truncate">
+              Dernières sessions
+            </h2>
+            <p className="text-sm text-[rgba(245,241,232,0.5)] mt-0.5 mobile:text-xs">3 plus récentes</p>
           </div>
           <button
             onClick={() => router.push('/sessions')}
@@ -214,9 +281,7 @@ export default function HomePage() {
               Aucune session terminée
             </div>
           ) : (
-            recentSessions.map((session) => (
-              <SessionCard key={session.id} session={session} />
-            ))
+            recentSessions.map((session) => <SessionCard key={session.id} session={session} />)
           )}
         </div>
       </div>

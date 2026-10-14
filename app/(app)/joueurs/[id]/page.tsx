@@ -44,6 +44,9 @@ interface PlayerProfile {
     points: number;
   }>;
   spotPerformance: Array<{
+    spotSub: string;
+    makes: number;
+    attempts: number;
     spotNum: number;
     spotLabel: string;
     rate: number;

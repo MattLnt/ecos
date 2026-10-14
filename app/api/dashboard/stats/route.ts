@@ -2,121 +2,151 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { activeMinutesBySession } from '@/lib/sessionDuration';
 
+// Classification des spots, identique aux statistiques détaillées.
+const isMid = (label: string) => label?.includes('MID') && !label?.includes('LANCER FRANC');
+const isThree = (label: string) => label?.includes('3 PTS') || label?.includes('3PTS');
+
+const SHOTS_PER_SPOT = 10;
+const FT_PER_SPOT = 2;
+
+/** Évolution d'un mois sur l'autre. `null` quand il n'y a rien à comparer. */
+function growth(current: number, previous: number): number | null {
+  if (previous === 0) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
+function rate(makes: number, attempts: number) {
+  return {
+    makes,
+    attempts,
+    rate: attempts > 0 ? Math.round((makes / attempts) * 1000) / 10 : 0,
+  };
+}
+
 export async function GET() {
   try {
     const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-
-    // Sessions totales
-    const totalSessions = await prisma.session.count({
-      where: { status: 'completed' },
-    });
-
-    const lastMonthSessions = await prisma.session.count({
-      where: {
-        status: 'completed',
-        date: { gte: lastMonth },
-      },
-    });
-
-    // Joueurs actifs (participants uniques ce mois)
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const activePlayersData = await prisma.sessionPlayer.findMany({
-      where: {
-        session: {
-          date: { gte: thisMonthStart },
-          status: 'completed',
-        },
-      },
-      select: {
-        playerId: true,
-      },
-      distinct: ['playerId'],
-    });
-    const activePlayers = activePlayersData.length;
-
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthPlayersData = await prisma.sessionPlayer.findMany({
-      where: {
-        session: {
-          date: { gte: lastMonthStart, lt: thisMonthStart },
-          status: 'completed',
-        },
-      },
-      select: {
-        playerId: true,
-      },
-      distinct: ['playerId'],
-    });
-    const lastMonthPlayers = lastMonthPlayersData.length;
 
-    // Moyenne des points
-    const avgPointsResult = await prisma.sessionPlayer.aggregate({
-      where: {
-        session: { status: 'completed' },
-      },
-      _avg: {
-        totalPoints: true,
-      },
+    const completedSessions = await prisma.session.findMany({
+      where: { status: 'completed' },
+      select: { id: true, date: true },
     });
-    const avgPoints = avgPointsResult._avg.totalPoints || 0;
 
-    const lastMonthAvgResult = await prisma.sessionPlayer.aggregate({
-      where: {
-        session: {
-          status: 'completed',
-          date: { gte: lastMonth },
-        },
-      },
-      _avg: {
-        totalPoints: true,
-      },
-    });
-    const lastMonthAvg = lastMonthAvgResult._avg.totalPoints || 0;
+    const totalSessions = completedSessions.length;
+    const sessionsThisMonth = completedSessions.filter((s) => s.date >= thisMonthStart).length;
+    const sessionsLastMonth = completedSessions.filter(
+      (s) => s.date >= lastMonthStart && s.date < thisMonthStart
+    ).length;
 
     /*
-      Temps total (en minutes), mesuré sur les saisies de chaque session.
-
-      La soustraction `endedAt - startedAt` donnait des totaux absurdes :
-      `endedAt` était réécrit à chaque ouverture d'une page résultats, et une
-      session reprise le lendemain comptait la nuit entière.
+      Joueurs actifs : participants distincts du mois en cours, comparés au
+      mois précédent et non au total. L'ancienne version divisait un cumul de
+      toute l'histoire par le dernier mois : la variation affichée sur les
+      sessions ne voulait rien dire.
     */
-    const completedSessions = await prisma.session.findMany({
-      where: {
-        status: 'completed',
-        endedAt: { not: null },
-      },
-      select: { id: true },
-    });
+    const [activeThisMonth, activeLastMonth] = await Promise.all([
+      prisma.sessionPlayer.findMany({
+        where: { session: { date: { gte: thisMonthStart }, status: 'completed' } },
+        select: { playerId: true },
+        distinct: ['playerId'],
+      }),
+      prisma.sessionPlayer.findMany({
+        where: {
+          session: { date: { gte: lastMonthStart, lt: thisMonthStart }, status: 'completed' },
+        },
+        select: { playerId: true },
+        distinct: ['playerId'],
+      }),
+    ]);
 
+    const [avgAll, avgThisMonth, avgLastMonth] = await Promise.all([
+      prisma.sessionPlayer.aggregate({
+        where: { session: { status: 'completed' } },
+        _avg: { totalPoints: true },
+      }),
+      prisma.sessionPlayer.aggregate({
+        where: { session: { status: 'completed', date: { gte: thisMonthStart } } },
+        _avg: { totalPoints: true },
+      }),
+      prisma.sessionPlayer.aggregate({
+        where: {
+          session: { status: 'completed', date: { gte: lastMonthStart, lt: thisMonthStart } },
+        },
+        _avg: { totalPoints: true },
+      }),
+    ]);
+
+    // Temps de jeu, mesuré sur les saisies et non sur `endedAt - startedAt`.
     const minutesBySession = await activeMinutesBySession();
     const totalMinutes = completedSessions.reduce(
       (sum, session) => sum + (minutesBySession.get(session.id) ?? 0),
       0
     );
 
-    // Calcul des croissances
-    const sessionsGrowth = lastMonthSessions > 0 
-      ? ((totalSessions - lastMonthSessions) / lastMonthSessions) * 100 
-      : 0;
-    
-    const playersGrowth = lastMonthPlayers > 0 
-      ? ((activePlayers - lastMonthPlayers) / lastMonthPlayers) * 100 
-      : 0;
-    
-    const pointsGrowth = lastMonthAvg > 0 
-      ? ((avgPoints - lastMonthAvg) / lastMonthAvg) * 100 
-      : 0;
+    /*
+      Adresse du club. C'est le cœur de l'application, et le tableau de bord
+      l'ignorait : il fallait ouvrir les statistiques pour savoir si on tirait
+      bien.
+    */
+    const spotResults = await prisma.spotResult.findMany({
+      where: { sessionPlayer: { session: { status: 'completed' } } },
+      select: { spotLabel: true, makes: true, ftMakes: true },
+    });
+
+    let midMakes = 0;
+    let midAttempts = 0;
+    let threeMakes = 0;
+    let threeAttempts = 0;
+    let ftMakes = 0;
+    let ftAttempts = 0;
+
+    spotResults.forEach((result) => {
+      if (isMid(result.spotLabel)) {
+        midAttempts += SHOTS_PER_SPOT;
+        midMakes += result.makes;
+      } else if (isThree(result.spotLabel)) {
+        threeAttempts += SHOTS_PER_SPOT;
+        threeMakes += result.makes;
+      }
+      ftAttempts += FT_PER_SPOT;
+      ftMakes += result.ftMakes;
+    });
+
+    // Record du club : le meilleur score réalisé sur une session.
+    const best = await prisma.sessionPlayer.findFirst({
+      where: { session: { status: 'completed' } },
+      orderBy: { totalPoints: 'desc' },
+      include: { player: true, session: { select: { id: true, date: true } } },
+    });
 
     return NextResponse.json({
       totalSessions,
-      activePlayers,
-      avgPoints: Math.round(avgPoints * 10) / 10,
+      sessionsThisMonth,
+      activePlayers: activeThisMonth.length,
+      avgPoints: Math.round((avgAll._avg.totalPoints || 0) * 10) / 10,
       totalMinutes,
+      shooting: {
+        mid: rate(midMakes, midAttempts),
+        three: rate(threeMakes, threeAttempts),
+        ft: rate(ftMakes, ftAttempts),
+      },
+      bestScore: best
+        ? {
+            points: best.totalPoints,
+            firstName: best.player.firstName,
+            lastName: best.player.lastName,
+            photo: best.player.photo,
+            avatar: best.player.avatar,
+            playerId: best.player.id,
+            date: best.session.date,
+          }
+        : null,
       growth: {
-        sessions: Math.round(sessionsGrowth * 10) / 10,
-        players: Math.round(playersGrowth * 10) / 10,
-        points: Math.round(pointsGrowth * 10) / 10,
+        sessions: growth(sessionsThisMonth, sessionsLastMonth),
+        players: growth(activeThisMonth.length, activeLastMonth.length),
+        points: growth(avgThisMonth._avg.totalPoints || 0, avgLastMonth._avg.totalPoints || 0),
       },
     });
   } catch (error) {

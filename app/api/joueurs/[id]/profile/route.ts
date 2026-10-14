@@ -101,6 +101,7 @@ export async function GET(
         acc[sr.spotNum] = {
           spotNum: sr.spotNum,
           spotLabel: sr.spotLabel,
+          spotSub: sr.spotSub,
           totalAttempts: 0,
           totalMakes: 0,
         };
@@ -114,7 +115,11 @@ export async function GET(
       .map((spot: any) => ({
         spotNum: spot.spotNum,
         spotLabel: spot.spotLabel,
+        spotSub: spot.spotSub,
         rate: (spot.totalMakes / spot.totalAttempts) * 100,
+        // Le volume suit le taux, comme dans toutes les autres vues.
+        makes: spot.totalMakes,
+        attempts: spot.totalAttempts,
       }))
       .sort((a, b) => a.spotNum - b.spotNum);
 
