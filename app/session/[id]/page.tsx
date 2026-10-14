@@ -7,12 +7,7 @@ import { LF_SPOT } from '@/components/shooting/constants';
 import { Undo2, X, Trophy, ChevronDown, CloudOff, RefreshCw } from 'lucide-react';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { useWakeLock } from '@/lib/useWakeLock';
-import {
-  enqueueSpotOp,
-  startSpotQueue,
-  usePendingSpotCount,
-  useIsOnline,
-} from '@/lib/spotQueue';
+import { enqueueSpotOp, usePendingSpotCount, useIsOnline } from '@/lib/spotQueue';
 import { GROUP_LABELS, groupKeysOf, groupOf } from '@/lib/groups';
 import type { AnySpot, SpotScore } from '@/components/shooting/types';
 
@@ -542,13 +537,8 @@ export default function SessionPage() {
   */
   useWakeLock(!!session);
 
-  /*
-    La file est rejouée au retour du réseau et quand l'onglet repasse au
-    premier plan — y compris les saisies d'une visite précédente, qu'un
-    rechargement aurait sinon laissées en plan.
-  */
-  useEffect(() => startSpotQueue(), []);
-
+  // La file tourne à la racine de l'application (`SpotQueueFlusher`) : ici on
+  // ne fait qu'afficher son état.
   const pendingSaves = usePendingSpotCount();
   const isOnline = useIsOnline();
 

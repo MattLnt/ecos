@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, Oswald, Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
+import { SpotQueueFlusher } from "@/components/SpotQueueFlusher";
 
 const outfit = Outfit({ 
   subsets: ["latin"],
@@ -55,6 +56,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className={`${outfit.variable} ${oswald.variable} ${barlow.variable} ${barlowCondensed.variable} antialiased`}>
+        <SpotQueueFlusher />
         {children}
       </body>
     </html>
