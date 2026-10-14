@@ -10,6 +10,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.1.0",
     "@prisma/client": "^5.22.0",
     "date-fns": "^4.2.1",
     "framer-motion": "^12.39.0",

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
+import PhotoEditor from './PhotoEditor';
 
 interface ImageUploadProps {
   value: string;
@@ -12,6 +13,8 @@ interface ImageUploadProps {
 export default function ImageUpload({ value, onChange, maxSizeMB = 2 }: ImageUploadProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Image en attente de cadrage : l'éditeur s'ouvre dès qu'un fichier arrive.
+  const [editing, setEditing] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,13 +37,20 @@ export default function ImageUpload({ value, onChange, maxSizeMB = 2 }: ImageUpl
     setLoading(true);
 
     try {
+      /*
+        La photo passe par l'éditeur avant d'être retenue : on la réduit
+        d'abord pour que le cadrage reste fluide, le découpage final se fait
+        dans l'éditeur.
+      */
       const compressedBase64 = await compressImage(file);
-      onChange(compressedBase64);
+      setEditing(compressedBase64);
     } catch (err) {
       console.error('Erreur upload:', err);
       setError('Erreur lors du chargement');
     } finally {
       setLoading(false);
+      // Rechoisir le même fichier doit redéclencher l'éditeur.
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -153,6 +163,17 @@ export default function ImageUpload({ value, onChange, maxSizeMB = 2 }: ImageUpl
 
   return (
     <div className="space-y-3">
+      {editing && (
+        <PhotoEditor
+          source={editing}
+          onCancel={() => setEditing(null)}
+          onValidate={(dataUrl) => {
+            onChange(dataUrl);
+            setEditing(null);
+          }}
+        />
+      )}
+
       <input
         ref={fileInputRef}
         type="file"
