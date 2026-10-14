@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { SpotBar, rateColor } from './SpotBar';
 
 interface SpotStat {
   spotNum: number;
@@ -9,13 +10,6 @@ interface SpotStat {
   spotSub: string;
   fullLabel?: string;
   successRate: number;
-}
-
-/** Vert au-dessus de 60 %, jaune au-dessus de 40 %, rouge en dessous. */
-function rateColor(rate: number) {
-  if (rate >= 60) return '#22C55E';
-  if (rate >= 40) return '#FACC15';
-  return '#F87171';
 }
 
 export function SpotPerformance() {
@@ -135,35 +129,13 @@ export function SpotPerformance() {
         */}
         <div className="hidden mobile:block space-y-2">
           {spots.map((spot) => (
-            <div key={spot.spotNum} className="flex items-center gap-2.5">
-              <div className="w-6 h-6 shrink-0 bg-[rgba(0,191,255,0.12)] rounded-md flex items-center justify-center font-mono text-[11px] font-bold text-[#00BFFF]">
-                {spot.spotNum}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[11px] font-semibold text-[rgba(245,241,232,0.8)] truncate">
-                    {spot.spotLabel}
-                    <span className="text-[rgba(245,241,232,0.35)] font-normal"> {spot.spotSub}</span>
-                  </span>
-                  <span
-                    className="font-mono text-sm font-extrabold shrink-0"
-                    style={{ color: rateColor(spot.successRate) }}
-                  >
-                    {spot.successRate.toFixed(0)}%
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 rounded-full bg-[rgba(245,241,232,0.07)] overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.min(100, Math.max(0, spot.successRate))}%`,
-                      backgroundColor: rateColor(spot.successRate),
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
+            <SpotBar
+              key={spot.spotNum}
+              spotNum={spot.spotNum}
+              spotLabel={spot.spotLabel}
+              spotSub={spot.spotSub}
+              rate={spot.successRate}
+            />
           ))}
         </div>
       </div>

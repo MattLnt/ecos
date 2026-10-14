@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, Edit2, Trash2, Grid3x3, List, X, AlertTriangle, Check } from 'lucide-react';
 import PlayerModal from './PlayerModal';
 import { PlayerCard } from '@/components/joueurs/PlayerCard';
@@ -31,6 +32,7 @@ interface PlayerWithStats extends Player {
 type ActionMode = 'none' | 'edit' | 'delete';
 
 export default function JoueursPage() {
+  const router = useRouter();
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -90,8 +92,10 @@ export default function JoueursPage() {
           ? prev.filter((id) => id !== player.id)
           : [...prev, player.id]
       );
+    } else {
+      // Hors mode action : la fiche du joueur, ses stats et son historique.
+      router.push(`/joueurs/${player.id}`);
     }
-    // En mode 'none', rien (ou plus tard, ouvrir profil)
   };
 
   const handleConfirmDelete = async () => {
@@ -288,18 +292,29 @@ export default function JoueursPage() {
         >
           {players.map((player) => {
             const isSelected = selectedForDelete.includes(player.id);
-            const isClickable = actionMode !== 'none';
 
             return (
               <div
                 key={player.id}
-                className={`relative flex justify-center transition-all ${
-                  isClickable ? 'cursor-pointer' : ''
-                } ${isSelected ? 'scale-95' : ''}`}
+                className={`relative flex justify-center cursor-pointer transition-all ${
+                  isSelected ? 'scale-95' : ''
+                }`}
                 onClick={() => handleCardClick(player)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleCardClick(player);
+                  }
+                }}
               >
                 <div className={`relative transition-all ${
-                  actionMode === 'edit' ? 'hover:scale-105 hover:ring-4 hover:ring-[#00BFFF]/50 rounded-2xl' : ''
+                  actionMode === 'edit'
+                    ? 'hover:scale-105 hover:ring-4 hover:ring-[#00BFFF]/50 rounded-2xl'
+                    : actionMode === 'none'
+                    ? 'hover:scale-[1.03] rounded-2xl'
+                    : ''
                 } ${
                   isSelected ? 'ring-4 ring-red-500 rounded-2xl' : ''
                 } ${
@@ -339,15 +354,20 @@ export default function JoueursPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {players.map((player) => {
             const isSelected = selectedForDelete.includes(player.id);
-            const isClickable = actionMode !== 'none';
 
             return (
               <div
                 key={player.id}
-                onClick={() => isClickable && handleCardClick(player)}
-                className={`bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border rounded-xl p-4 sm:p-6 transition-all ${
-                  isClickable ? 'cursor-pointer' : ''
-                } ${
+                onClick={() => handleCardClick(player)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleCardClick(player);
+                  }
+                }}
+                className={`bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border rounded-xl p-4 sm:p-6 transition-all cursor-pointer ${
                   isSelected
                     ? 'border-red-500 ring-2 ring-red-500/50'
                     : actionMode === 'edit'
@@ -411,7 +431,7 @@ export default function JoueursPage() {
 
       {/* Modal confirmation suppression */}
       {confirmDeleteOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
           <div className="bg-[#0A1628] border border-red-500/30 rounded-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header alert */}
             <div className="px-6 py-5 border-b border-red-500/20 bg-gradient-to-r from-red-500/10 to-transparent">

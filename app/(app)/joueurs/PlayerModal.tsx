@@ -135,8 +135,8 @@ export default function PlayerModal({ player, onClose }: PlayerModalProps) {
   const selectedTeam = NBA_TEAMS.find(t => t.code === formData.nbaTeam);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0A1628] border border-[rgba(0,191,255,0.2)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 mobile:p-3">
+      <div className="bg-[#0A1628] border border-[rgba(0,191,255,0.2)] rounded-2xl w-full max-w-2xl max-h-[90dvh] mobile:max-h-[88dvh] overflow-y-auto custom-scrollbar overscroll-contain">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[rgba(0,191,255,0.15)] sticky top-0 bg-[#0A1628] z-10">
           <h2 className="text-2xl font-bold text-[#F5F1E8]">
@@ -336,8 +336,9 @@ export default function PlayerModal({ player, onClose }: PlayerModalProps) {
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          {/* Actions — collées en bas du formulaire pour rester atteignables
+              sans dérouler les trente logos NBA et la palette de couleurs. */}
+          <div className="sticky bottom-0 -mx-6 -mb-6 px-6 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-[#0A1628] via-[#0A1628] to-transparent flex gap-3">
             <button
               type="button"
               onClick={onClose}

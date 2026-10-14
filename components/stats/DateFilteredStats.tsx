@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Trophy, TrendingDown, Target, Crosshair, ChevronRight, X } from 'lucide-react';
+import { SpotBar, rateColor } from './SpotBar';
 
 interface SessionInfo {
   sessionId: string;
@@ -50,6 +51,8 @@ interface SpotStat {
   spotSub: string;
   fullLabel: string;
   successRate: number;
+  makes: number;
+  attempts: number;
 }
 
 interface Records {
@@ -359,7 +362,8 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
             <div>
               <h3 className="text-lg font-bold text-[#F5F1E8] mb-3">Taux de réussite par spot</h3>
               <div className="bg-gradient-to-br from-[rgba(0,191,255,0.04)] to-[rgba(0,191,255,0.02)] border border-[rgba(0,191,255,0.15)] rounded-2xl p-4 sm:p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {/* Desktop : les dix tuiles. */}
+                <div className="grid mobile:hidden grid-cols-5 gap-3">
                   {data.spots.map((spot) => (
                     <div
                       key={spot.spotNum}
@@ -369,11 +373,10 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
                         <div className="w-8 h-8 bg-[rgba(0,191,255,0.15)] rounded-lg flex items-center justify-center">
                           <span className="font-bold text-sm text-[#00BFFF]">{spot.spotNum}</span>
                         </div>
-                        <div className={`text-xl font-bold ${
-                          spot.successRate >= 60 ? 'text-green-400' :
-                          spot.successRate >= 40 ? 'text-yellow-400' :
-                          'text-red-400'
-                        }`}>
+                        <div
+                          className="text-xl font-bold"
+                          style={{ color: rateColor(spot.successRate) }}
+                        >
                           {spot.successRate.toFixed(0)}%
                         </div>
                       </div>
@@ -383,7 +386,25 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
                       <div className="text-[10px] text-[rgba(245,241,232,0.35)] mt-1 uppercase tracking-wide">
                         {spot.spotSub}
                       </div>
+                      <div className="font-mono text-[10px] text-[rgba(245,241,232,0.35)] mt-1">
+                        {spot.makes}/{spot.attempts}
+                      </div>
                     </div>
+                  ))}
+                </div>
+
+                {/* Mobile : les mêmes barres que les stats globales. */}
+                <div className="hidden mobile:block space-y-2">
+                  {data.spots.map((spot) => (
+                    <SpotBar
+                      key={spot.spotNum}
+                      spotNum={spot.spotNum}
+                      spotLabel={spot.spotLabel}
+                      spotSub={spot.spotSub}
+                      rate={spot.successRate}
+                      makes={spot.makes}
+                      attempts={spot.attempts}
+                    />
                   ))}
                 </div>
               </div>
@@ -398,7 +419,7 @@ export function DateFilteredStats({ selectedDate, sessionsOfDay }: DateFilteredS
       */}
       {selectedPlayer && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 max-sm:items-end max-sm:p-0"
+          className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 max-sm:items-end max-sm:p-0"
           onClick={() => setSelectedPlayerId(null)}
           role="dialog"
           aria-modal="true"

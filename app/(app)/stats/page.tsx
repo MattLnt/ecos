@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { BarChart3, CalendarDays } from 'lucide-react';
 import { OverviewStats } from '@/components/stats/OverviewStats';
 import { SpotPerformance } from '@/components/stats/SpotPerformance';
+import { SpotRecords } from '@/components/stats/SpotRecords';
 import { PlayerRanking } from '@/components/stats/PlayerRanking';
 import { Records } from '@/components/stats/Records';
 import { Trends } from '@/components/stats/Trends';
@@ -93,6 +94,7 @@ export default function StatsPage() {
         <div className="space-y-8 mobile:space-y-6">
           <OverviewStats />
           <SpotPerformance />
+          <SpotRecords />
           <PlayerRanking />
           <Records />
           <Trends />

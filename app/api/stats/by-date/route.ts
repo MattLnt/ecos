@@ -221,6 +221,9 @@ export async function GET(request: Request) {
         spotSub: s.spotSub,
         fullLabel: `${s.spotLabel} ${s.spotSub}`.trim(),
         successRate: s.total > 0 ? Math.round((s.makes / s.total) * 1000) / 10 : 0,
+        // Le volume accompagne le taux, comme partout ailleurs.
+        makes: s.makes,
+        attempts: s.total,
       }))
       .sort((a, b) => a.spotNum - b.spotNum);
 
