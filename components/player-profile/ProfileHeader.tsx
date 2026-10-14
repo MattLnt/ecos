@@ -48,10 +48,17 @@ export function ProfileHeader({
           <ArrowLeft size={20} className="text-[#00BFFF]" />
         </button>
         <div>
-          <h1 className="text-4xl font-extrabold text-[#F5F1E8] tracking-tight mobile:text-3xl">
-            Profil joueur
+          {/*
+            La carte n'affiche plus que le prénom et l'initiale : le nom
+            complet doit rester lisible quelque part sur la fiche, et un titre
+            « Profil joueur » n'apprenait rien.
+          */}
+          <h1 className="text-4xl font-extrabold text-[#F5F1E8] tracking-tight mobile:text-2xl truncate">
+            {firstName} {lastName}
           </h1>
-          <p className="text-[rgba(245,241,232,0.55)] mt-1">Statistiques détaillées et performances</p>
+          <p className="text-[rgba(245,241,232,0.55)] mt-1 mobile:text-sm">
+            Statistiques détaillées et performances
+          </p>
         </div>
       </div>
 

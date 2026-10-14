@@ -36,6 +36,15 @@ export function FutPlayerCard({
   className,
 }: FutPlayerCardProps) {
   const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
+
+  /*
+    Prénom et initiale du nom. Le nom seul ne distingue pas deux frères, et
+    c'est le prénom qu'on emploie au bord du terrain ; l'initiale suffit à
+    séparer deux prénoms identiques.
+  */
+  const displayName = lastName
+    ? `${firstName} ${lastName[0]}.`
+    : firstName;
   const logo = nbaTeam ? NBA_LOGOS[nbaTeam] : undefined;
 
   return (
@@ -79,7 +88,7 @@ export function FutPlayerCard({
             )}
           </div>
 
-          <div className={styles.name}>{lastName.toUpperCase()}</div>
+          <div className={styles.name}>{displayName.toUpperCase()}</div>
           <div className={styles.divider} />
           <div className={styles.dividerGem} />
 
